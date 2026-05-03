@@ -1,7 +1,9 @@
 package de.klausiiiii.mobArmyBattle;
 
 import de.klausiiiii.mobArmyBattle.command.MabCommand;
+import de.klausiiiii.mobArmyBattle.listener.MobKillListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerConnectionListener;
+import de.klausiiiii.mobArmyBattle.listener.PlayerDeathFarmListener;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.command.PluginCommand;
@@ -32,6 +34,10 @@ public final class MobArmyBattle extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(
                 new PlayerConnectionListener(matchManager, worldManager), this);
+        getServer().getPluginManager().registerEvents(
+                new MobKillListener(matchManager), this);
+        getServer().getPluginManager().registerEvents(
+                new PlayerDeathFarmListener(matchManager), this);
 
         getLogger().info("MobArmyBattle aktiviert.");
     }
