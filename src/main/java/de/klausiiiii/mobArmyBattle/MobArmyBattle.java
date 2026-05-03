@@ -2,15 +2,18 @@ package de.klausiiiii.mobArmyBattle;
 
 import de.klausiiiii.mobArmyBattle.command.MabCommand;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
+import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class MobArmyBattle extends JavaPlugin {
 
     private MatchManager matchManager;
+    private WorldManager worldManager;
 
     @Override
     public void onEnable() {
+        worldManager = new WorldManager(this);
         matchManager = new MatchManager();
 
         PluginCommand mabCmd = getCommand("mab");
@@ -33,5 +36,9 @@ public final class MobArmyBattle extends JavaPlugin {
 
     public MatchManager getMatchManager() {
         return matchManager;
+    }
+
+    public WorldManager getWorldManager() {
+        return worldManager;
     }
 }
