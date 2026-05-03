@@ -1,0 +1,9 @@
+name: MobArmyBattle
+description: $description
+version: '${version}'
+
+main: de.klausiiiii.mobArmyBattle.MobArmyBattle
+api-version: '26.1.2'
+load: POSTWORLD
+
+authors: [ Klausiiiii ]
