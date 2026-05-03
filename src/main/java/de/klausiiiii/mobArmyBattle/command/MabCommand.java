@@ -25,7 +25,7 @@ import java.util.UUID;
 
 public class MabCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = List.of("create", "join", "leave", "start");
+    private static final List<String> SUBCOMMANDS = List.of("create", "join", "leave", "start", "pool");
 
     private final MatchManager matchManager;
     private final MobArmyBattle plugin;
@@ -55,6 +55,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 case "join" -> handleJoin(player, args);
                 case "leave" -> handleLeave(player);
                 case "start" -> handleStart(player);
+                case "pool" -> handlePool(player);
                 default -> sendUsage(player);
             }
         } catch (IllegalStateException | IllegalArgumentException e) {
@@ -128,12 +129,46 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handlePool(Player player) {
+        Match match = matchManager.getMatchOf(player.getUniqueId());
+        if (match == null) {
+            player.sendMessage(Component.text("Du bist in keinem Match.", NamedTextColor.RED));
+            return;
+        }
+        Team team = match.findTeamOf(player.getUniqueId());
+        if (team == null || team.getPool().getEntries().isEmpty()) {
+            player.sendMessage(Component.text("Pool ist leer.", NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Component.text("Team-Pool (" + team.getPool().totalCount() + " Mobs):",
+                NamedTextColor.GOLD));
+        team.getPool().getEntries().forEach((entry, count) -> {
+            String label = entry.getEntityTypeName().toLowerCase();
+            String eq = entry.getEquipmentSignature();
+            boolean hasEq = !eq.equals("none|none|none|none|none|none");
+            String suffix = hasEq ? " (" + summarize(eq) + ")" : "";
+            player.sendMessage(Component.text(
+                    "  " + label + suffix + " x " + count,
+                    NamedTextColor.GRAY));
+        });
+    }
+
+    private String summarize(String eq) {
+        for (String slot : eq.split("\\|")) {
+            if (!slot.equals("none")) {
+                return slot;
+            }
+        }
+        return "geared";
+    }
+
     private void sendUsage(Player player) {
         player.sendMessage(Component.text("MobArmyBattle-Befehle:", NamedTextColor.GOLD));
         player.sendMessage(Component.text("/mab create — Match erstellen", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab join <captain> — Match beitreten", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leave — Match verlassen", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab start — Match starten (nur Captain)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab pool — Team-Pool anzeigen", NamedTextColor.GRAY));
     }
 
     @Override
