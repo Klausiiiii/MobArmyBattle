@@ -6,6 +6,7 @@ import de.klausiiiii.mobArmyBattle.match.MatchManager;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
 import de.klausiiiii.mobArmyBattle.match.phase.FarmPhase;
+import de.klausiiiii.mobArmyBattle.match.phase.WaveBuildPhase;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -25,7 +26,7 @@ import java.util.UUID;
 
 public class MabCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = List.of("create", "join", "leave", "start", "pool");
+    private static final List<String> SUBCOMMANDS = List.of("create", "join", "leave", "start", "pool", "endfarm");
 
     private final MatchManager matchManager;
     private final MobArmyBattle plugin;
@@ -56,6 +57,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 case "leave" -> handleLeave(player);
                 case "start" -> handleStart(player);
                 case "pool" -> handlePool(player);
+                case "endfarm" -> handleEndFarm(player);
                 default -> sendUsage(player);
             }
         } catch (IllegalStateException | IllegalArgumentException e) {
@@ -172,6 +174,34 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleEndFarm(Player player) {
+        Match match = matchManager.getMatchOf(player.getUniqueId());
+        if (match == null) {
+            player.sendMessage(Component.text("Du bist in keinem Match.", NamedTextColor.RED));
+            return;
+        }
+        if (match.getCurrentPhase().getType() != MatchPhaseType.FARM) {
+            player.sendMessage(Component.text("Match ist nicht in Farm-Phase.", NamedTextColor.RED));
+            return;
+        }
+        Team team = match.findTeamOf(player.getUniqueId());
+        if (!team.getCaptainId().equals(player.getUniqueId())) {
+            player.sendMessage(Component.text("Nur ein Captain darf die Farm-Phase beenden.", NamedTextColor.RED));
+            return;
+        }
+        match.transitionTo(new WaveBuildPhase(plugin));
+        for (Team t : match.getTeams()) {
+            for (UUID memberId : t.getMemberIds()) {
+                Player member = Bukkit.getPlayer(memberId);
+                if (member != null) {
+                    member.sendMessage(Component.text(
+                            "Farm-Phase beendet — Captains bauen jetzt Wellen.",
+                            NamedTextColor.GOLD));
+                }
+            }
+        }
+    }
+
     private void handlePool(Player player) {
         Match match = matchManager.getMatchOf(player.getUniqueId());
         if (match == null) {
@@ -212,6 +242,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/mab leave — Match verlassen", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab start — Match starten (nur Captain)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab pool — Team-Pool anzeigen", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab endfarm — Farm-Phase beenden (nur Captain)", NamedTextColor.GRAY));
     }
 
     @Override
