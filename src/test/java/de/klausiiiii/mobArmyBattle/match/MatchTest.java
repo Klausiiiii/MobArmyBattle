@@ -134,4 +134,49 @@ class MatchTest {
         Match match = new Match("test-match-1");
         assertNotNull(match.getId());
     }
+
+    @Test
+    void matchHasMode() {
+        Match match = new Match("test-match-1", 0L, MatchMode.parse("2v2"));
+
+        assertEquals(MatchMode.parse("2v2"), match.getMode());
+    }
+
+    @Test
+    void backwardsCompatibleConstructorsUseDefault1v1Mode() {
+        Match m1 = new Match("test-match-1");
+        Match m2 = new Match("test-match-2", 42L);
+
+        assertEquals(MatchMode.parse("1v1"), m1.getMode());
+        assertEquals(MatchMode.parse("1v1"), m2.getMode());
+    }
+
+    @Test
+    void canStartReturnsFalseWhenTeamMissing() {
+        Match match = new Match("test-match-1", 0L, MatchMode.parse("1v1"));
+        match.addTeam(new Team(UUID.randomUUID(), 1));
+
+        assertFalse(match.canStart());
+    }
+
+    @Test
+    void canStartReturnsTrueWhenAllTeamsHaveAtLeastOnePlayer() {
+        Match match = new Match("test-match-1", 0L, MatchMode.parse("2v2"));
+        match.addTeam(new Team(UUID.randomUUID(), 2));
+        match.addTeam(new Team(UUID.randomUUID(), 2));
+
+        assertTrue(match.canStart());
+    }
+
+    @Test
+    void canStartReturnsFalseWhenTeamWasDisbanded() {
+        Match match = new Match("test-match-1", 0L, MatchMode.parse("1v1"));
+        Team team1 = new Team(UUID.randomUUID(), 1);
+        Team team2 = new Team(UUID.randomUUID(), 1);
+        match.addTeam(team1);
+        match.addTeam(team2);
+        team2.disband();
+
+        assertFalse(match.canStart());
+    }
 }
