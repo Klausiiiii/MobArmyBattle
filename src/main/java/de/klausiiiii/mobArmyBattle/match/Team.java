@@ -1,6 +1,7 @@
 package de.klausiiiii.mobArmyBattle.match;
 
 import de.klausiiiii.mobArmyBattle.pool.MobPool;
+import de.klausiiiii.mobArmyBattle.wave.Wave;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -11,6 +12,8 @@ public class Team {
     private final Set<UUID> memberIds;
     private final MobPool pool;
     private final int maxSize;
+    private final Wave wave1;
+    private final Wave wave2;
 
     public Team(UUID captainId) {
         this(captainId, 0);
@@ -28,6 +31,8 @@ public class Team {
         this.memberIds.add(captainId);
         this.pool = new MobPool();
         this.maxSize = maxSize;
+        this.wave1 = new Wave();
+        this.wave2 = new Wave();
     }
 
     /**
@@ -46,6 +51,8 @@ public class Team {
         this.memberIds = new LinkedHashSet<>();
         this.pool = new MobPool();
         this.maxSize = maxSize;
+        this.wave1 = new Wave();
+        this.wave2 = new Wave();
     }
 
     /**
@@ -112,6 +119,18 @@ public class Team {
 
     public boolean isFull() {
         return maxSize > 0 && memberIds.size() >= maxSize;
+    }
+
+    public Wave getWave1() {
+        return wave1;
+    }
+
+    public Wave getWave2() {
+        return wave2;
+    }
+
+    public boolean wavesFinalised() {
+        return wave1.isFinalised() && wave2.isFinalised();
     }
 
     public boolean isDisbanded() {

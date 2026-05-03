@@ -162,4 +162,31 @@ class TeamTest {
         Team team = new Team(UUID.randomUUID(), 3);
         assertEquals(3, team.getMaxSize());
     }
+
+    @Test
+    void newTeamHasTwoEmptyWaves() {
+        Team team = new Team(UUID.randomUUID());
+
+        assertNotNull(team.getWave1());
+        assertNotNull(team.getWave2());
+        assertEquals(0, team.getWave1().totalMobCount());
+        assertEquals(0, team.getWave2().totalMobCount());
+    }
+
+    @Test
+    void wavesFinalisedReturnsTrueOnlyWhenBothFinalised() {
+        Team team = new Team(UUID.randomUUID());
+        de.klausiiiii.mobArmyBattle.pool.MobEntry zombie =
+                new de.klausiiiii.mobArmyBattle.pool.MobEntry("ZOMBIE", "none|none|none|none|none|none");
+
+        assertFalse(team.wavesFinalised());
+
+        team.getWave1().add(zombie, 1);
+        team.getWave1().finalise();
+        assertFalse(team.wavesFinalised());
+
+        team.getWave2().add(zombie, 1);
+        team.getWave2().finalise();
+        assertTrue(team.wavesFinalised());
+    }
 }
