@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -20,7 +21,8 @@ public class MatchManager {
             throw new IllegalStateException("Spieler ist bereits in einem Match: " + captainId);
         }
         String id = "match-" + matchIdCounter.getAndIncrement();
-        Match match = new Match(id);
+        long seed = new Random().nextLong();
+        Match match = new Match(id, seed);
         match.addTeam(new Team(captainId));
         matchesById.put(id, match);
         matchByPlayer.put(captainId, match);
