@@ -7,3 +7,20 @@ api-version: '26.1.2'
 load: POSTWORLD
 
 authors: [ Klausiiiii ]
+
+commands:
+  mab:
+    description: MobArmyBattle main command
+    usage: /mab <create|join|leave|start> [args]
+    aliases: [ mobarmybattle ]
+
+permissions:
+  mobarmybattle.create:
+    default: true
+    description: Allow creating matches
+  mobarmybattle.join:
+    default: true
+    description: Allow joining matches
+  mobarmybattle.admin:
+    default: op
+    description: Admin commands
