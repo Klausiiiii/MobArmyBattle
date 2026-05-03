@@ -57,10 +57,9 @@ public class MatchManager {
             if (nextCaptain != null) {
                 team.promoteToCaptain(nextCaptain);
                 team.removeMember(playerId);
+            } else {
+                team.disband();
             }
-            // If nextCaptain is null, captain was the last member of this team.
-            // We can't remove him via Team.removeMember (it would throw); the
-            // match-empty check below handles cleanup based on matchByPlayer.
         } else {
             team.removeMember(playerId);
         }

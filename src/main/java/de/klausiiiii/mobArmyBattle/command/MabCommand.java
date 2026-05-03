@@ -71,7 +71,7 @@ public class MabCommand implements CommandExecutor {
             return;
         }
         matchManager.joinMatch(player.getUniqueId(), captainPlayer.getUniqueId());
-        player.sendMessage(Component.text("Match beigetreten von " + captainPlayer.getName(),
+        player.sendMessage(Component.text("Du bist " + captainPlayer.getName() + "s Match beigetreten.",
                 NamedTextColor.GREEN));
         captainPlayer.sendMessage(Component.text(player.getName() + " ist deinem Match beigetreten.",
                 NamedTextColor.GREEN));

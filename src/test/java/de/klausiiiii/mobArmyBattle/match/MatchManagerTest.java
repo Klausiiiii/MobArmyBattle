@@ -129,4 +129,18 @@ class MatchManagerTest {
         assertNull(manager.getMatchOf(captain));
         assertFalse(manager.getActiveMatches().contains(match));
     }
+
+    @Test
+    void leavingAsSoloCaptainDisbandsTeam() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        Match match = manager.createMatch(captain);
+        Team team = match.getTeams().get(0);
+
+        manager.leaveMatch(captain);
+
+        assertTrue(team.isDisbanded(), "Team should be disbanded after solo captain leaves");
+        assertNull(team.getCaptainId());
+        assertEquals(0, team.size());
+    }
 }

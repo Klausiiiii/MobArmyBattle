@@ -54,4 +54,13 @@ public class Team {
     public int size() {
         return memberIds.size();
     }
+
+    public boolean isDisbanded() {
+        return captainId == null;
+    }
+
+    public void disband() {
+        this.captainId = null;
+        this.memberIds.clear();
+    }
 }

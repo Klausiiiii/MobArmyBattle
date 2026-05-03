@@ -91,4 +91,25 @@ class TeamTest {
 
         assertTrue(team.hasMember(captain));
     }
+
+    @Test
+    void disbandClearsCaptainAndMembers() {
+        UUID captain = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        Team team = new Team(captain);
+        team.addMember(member);
+
+        team.disband();
+
+        assertNull(team.getCaptainId());
+        assertEquals(0, team.size());
+        assertTrue(team.isDisbanded());
+    }
+
+    @Test
+    void newTeamIsNotDisbanded() {
+        Team team = new Team(UUID.randomUUID());
+
+        assertFalse(team.isDisbanded());
+    }
 }
