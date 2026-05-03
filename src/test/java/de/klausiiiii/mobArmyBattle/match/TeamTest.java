@@ -112,4 +112,11 @@ class TeamTest {
 
         assertFalse(team.isDisbanded());
     }
+
+    @Test
+    void newTeamHasEmptyPool() {
+        Team team = new Team(UUID.randomUUID());
+        assertNotNull(team.getPool());
+        assertEquals(0, team.getPool().totalCount());
+    }
 }
