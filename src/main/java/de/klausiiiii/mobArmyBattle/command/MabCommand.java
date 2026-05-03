@@ -1,5 +1,6 @@
 package de.klausiiiii.mobArmyBattle.command;
 
+import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
@@ -27,8 +28,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of("create", "join", "leave", "start");
 
     private final MatchManager matchManager;
+    private final MobArmyBattle plugin;
 
-    public MabCommand(MatchManager matchManager) {
+    public MabCommand(MobArmyBattle plugin, MatchManager matchManager) {
+        this.plugin = plugin;
         this.matchManager = matchManager;
     }
 
@@ -92,6 +95,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             return;
         }
         matchManager.leaveMatch(player.getUniqueId());
+        plugin.getWorldManager().teleportToLobby(player);
         player.sendMessage(Component.text("Match verlassen.", NamedTextColor.YELLOW));
     }
 
@@ -111,7 +115,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Nur der Captain darf starten.", NamedTextColor.RED));
             return;
         }
-        match.transitionTo(new FarmPhase());
+        match.transitionTo(new FarmPhase(plugin));
 
         for (Team t : match.getTeams()) {
             for (UUID memberId : t.getMemberIds()) {
