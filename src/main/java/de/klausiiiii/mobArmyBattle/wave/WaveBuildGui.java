@@ -33,13 +33,18 @@ public class WaveBuildGui implements Listener {
     private static final int TAB_WAVE1_SLOT = 18;
     private static final int TAB_WAVE2_SLOT = 26;
     private static final int RESET_BUTTON_SLOT = 45;
+    private static final int FORFEIT_BUTTON_SLOT = 47;
     private static final int CONFIRM_BUTTON_SLOT = 49;
     private static final int CANCEL_BUTTON_SLOT = 53;
+
+    private static final Component INVENTORY_TITLE =
+            Component.text("Wellen bauen", NamedTextColor.GOLD);
 
     private static class GuiSession {
         final UUID playerId;
         final Match match;
         final Team team;
+        Inventory inventory;
         int activeWave = 1;
 
         GuiSession(UUID playerId, Match match, Team team) {
@@ -66,33 +71,41 @@ public class WaveBuildGui implements Listener {
             return;
         }
         GuiSession session = new GuiSession(player.getUniqueId(), match, team);
+        Inventory inv = Bukkit.createInventory(null, INVENTORY_SIZE, INVENTORY_TITLE);
+        session.inventory = inv;
         sessions.put(player.getUniqueId(), session);
-        Inventory inv = Bukkit.createInventory(null, INVENTORY_SIZE,
-                Component.text("Wellen bauen — Welle " + session.activeWave, NamedTextColor.GOLD));
-        renderInto(inv, session);
+        renderInto(session);
         player.openInventory(inv);
     }
 
-    private void renderInto(Inventory inv, GuiSession session) {
+    private void renderInto(GuiSession session) {
+        Inventory inv = session.inventory;
         inv.clear();
         renderPool(inv, session);
-        inv.setItem(TAB_WAVE1_SLOT, tabIcon(1, session.activeWave == 1, session.team.getWave1().isFinalised()));
-        inv.setItem(TAB_WAVE2_SLOT, tabIcon(2, session.activeWave == 2, session.team.getWave2().isFinalised()));
+        inv.setItem(TAB_WAVE1_SLOT, tabIcon(1, session.activeWave == 1, session.team.getWave1()));
+        inv.setItem(TAB_WAVE2_SLOT, tabIcon(2, session.activeWave == 2, session.team.getWave2()));
         for (int i = 19; i < 26; i++) {
             inv.setItem(i, separator());
         }
         renderCurrentWave(inv, session);
-        inv.setItem(RESET_BUTTON_SLOT, button(Material.ORANGE_WOOL, "Welle zurücksetzen", NamedTextColor.GOLD));
-        inv.setItem(CONFIRM_BUTTON_SLOT, button(Material.LIME_WOOL, "Welle bestätigen", NamedTextColor.GREEN));
-        inv.setItem(CANCEL_BUTTON_SLOT, button(Material.RED_WOOL, "Schließen (ohne speichern)", NamedTextColor.RED));
+        inv.setItem(RESET_BUTTON_SLOT, button(Material.ORANGE_WOOL,
+                "Welle " + session.activeWave + " zurücksetzen", NamedTextColor.GOLD));
+        inv.setItem(FORFEIT_BUTTON_SLOT, button(Material.BARRIER,
+                "Welle " + session.activeWave + " aufgeben", NamedTextColor.RED));
+        inv.setItem(CONFIRM_BUTTON_SLOT, button(Material.LIME_WOOL,
+                "Welle " + session.activeWave + " bestätigen", NamedTextColor.GREEN));
+        inv.setItem(CANCEL_BUTTON_SLOT, button(Material.RED_WOOL,
+                "Schließen (ohne speichern)", NamedTextColor.RED));
     }
 
     private void renderPool(Inventory inv, GuiSession session) {
         MobPool pool = session.team.getPool();
         Wave currentWave = currentWave(session);
         Map<MobEntry, Integer> remaining = new HashMap<>(pool.getEntries());
-        for (WaveSlot slot : currentWave.getSlots()) {
-            remaining.merge(slot.getEntry(), -slot.getCount(), Integer::sum);
+        if (!currentWave.isFinalised()) {
+            for (WaveSlot slot : currentWave.getSlots()) {
+                remaining.merge(slot.getEntry(), -slot.getCount(), Integer::sum);
+            }
         }
         int slotIdx = 0;
         for (Map.Entry<MobEntry, Integer> e : remaining.entrySet()) {
@@ -116,11 +129,25 @@ public class WaveBuildGui implements Listener {
         return session.activeWave == 1 ? session.team.getWave1() : session.team.getWave2();
     }
 
-    private ItemStack tabIcon(int waveNum, boolean active, boolean finalised) {
-        Material mat = finalised ? Material.GREEN_CONCRETE : (active ? Material.YELLOW_CONCRETE : Material.GRAY_CONCRETE);
+    private ItemStack tabIcon(int waveNum, boolean active, Wave wave) {
+        Material mat;
+        String suffix;
+        if (wave.isForfeited()) {
+            mat = Material.BARRIER;
+            suffix = " (aufgegeben)";
+        } else if (wave.isFinalised()) {
+            mat = Material.GREEN_CONCRETE;
+            suffix = " (bestätigt)";
+        } else if (active) {
+            mat = Material.YELLOW_CONCRETE;
+            suffix = " (aktiv)";
+        } else {
+            mat = Material.GRAY_CONCRETE;
+            suffix = "";
+        }
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Welle " + waveNum + (finalised ? " (bestätigt)" : ""),
+        meta.displayName(Component.text("Welle " + waveNum + suffix,
                 active ? NamedTextColor.YELLOW : NamedTextColor.WHITE)
                 .decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
@@ -177,8 +204,9 @@ public class WaveBuildGui implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         GuiSession session = sessions.get(player.getUniqueId());
         if (session == null) return;
+        if (event.getView().getTopInventory() != session.inventory) return;
         if (event.getClickedInventory() == null) return;
-        if (event.getClickedInventory() != event.getView().getTopInventory()) {
+        if (event.getClickedInventory() != session.inventory) {
             event.setCancelled(true);
             return;
         }
@@ -188,21 +216,25 @@ public class WaveBuildGui implements Listener {
 
         if (slot == TAB_WAVE1_SLOT) {
             session.activeWave = 1;
-            refreshTitle(player, session);
+            renderInto(session);
             return;
         }
         if (slot == TAB_WAVE2_SLOT) {
             session.activeWave = 2;
-            refreshTitle(player, session);
+            renderInto(session);
             return;
         }
         if (slot == RESET_BUTTON_SLOT) {
             resetWave(session);
-            renderInto(event.getInventory(), session);
+            renderInto(session);
+            return;
+        }
+        if (slot == FORFEIT_BUTTON_SLOT) {
+            tryForfeit(player, session);
             return;
         }
         if (slot == CONFIRM_BUTTON_SLOT) {
-            tryFinalise(player, session, event.getInventory());
+            tryFinalise(player, session);
             return;
         }
         if (slot == CANCEL_BUTTON_SLOT) {
@@ -211,6 +243,7 @@ public class WaveBuildGui implements Listener {
             return;
         }
         if (slot < 18) {
+            if (currentWave(session).isFinalised()) return;
             ItemStack item = event.getCurrentItem();
             if (item == null || item.getType().isAir()) return;
             MobEntry entry = poolEntryAtSlot(session, slot);
@@ -220,33 +253,29 @@ public class WaveBuildGui implements Listener {
             int toAdd = Math.min(amount, available);
             if (toAdd <= 0) return;
             currentWave(session).add(entry, toAdd);
-            renderInto(event.getInventory(), session);
+            renderInto(session);
             return;
         }
         if (slot >= 27 && slot < 45) {
+            if (currentWave(session).isFinalised()) return;
             ItemStack item = event.getCurrentItem();
             if (item == null || item.getType().isAir()) return;
             MobEntry entry = waveEntryAtSlot(session, slot);
             if (entry == null) return;
             int amount = event.isShiftClick() ? 5 : 1;
             currentWave(session).remove(entry, amount);
-            renderInto(event.getInventory(), session);
+            renderInto(session);
         }
-    }
-
-    private void refreshTitle(Player player, GuiSession session) {
-        Inventory newInv = Bukkit.createInventory(null, INVENTORY_SIZE,
-                Component.text("Wellen bauen — Welle " + session.activeWave, NamedTextColor.GOLD));
-        renderInto(newInv, session);
-        player.openInventory(newInv);
     }
 
     private MobEntry poolEntryAtSlot(GuiSession session, int slot) {
         MobPool pool = session.team.getPool();
         Wave currentWave = currentWave(session);
         Map<MobEntry, Integer> remaining = new HashMap<>(pool.getEntries());
-        for (WaveSlot ws : currentWave.getSlots()) {
-            remaining.merge(ws.getEntry(), -ws.getCount(), Integer::sum);
+        if (!currentWave.isFinalised()) {
+            for (WaveSlot ws : currentWave.getSlots()) {
+                remaining.merge(ws.getEntry(), -ws.getCount(), Integer::sum);
+            }
         }
         int idx = 0;
         for (Map.Entry<MobEntry, Integer> e : remaining.entrySet()) {
@@ -279,7 +308,7 @@ public class WaveBuildGui implements Listener {
         }
     }
 
-    private void tryFinalise(Player player, GuiSession session, Inventory inv) {
+    private void tryFinalise(Player player, GuiSession session) {
         Wave wave = currentWave(session);
         if (wave.isFinalised()) {
             player.sendMessage(Component.text("Welle ist bereits bestätigt.", NamedTextColor.YELLOW));
@@ -293,19 +322,39 @@ public class WaveBuildGui implements Listener {
         }
         player.sendMessage(Component.text("Welle " + session.activeWave + " bestätigt.",
                 NamedTextColor.GREEN));
+        afterFinalise(player, session);
+    }
+
+    private void tryForfeit(Player player, GuiSession session) {
+        Wave wave = currentWave(session);
+        if (wave.isFinalised()) {
+            player.sendMessage(Component.text("Welle ist bereits bestätigt/aufgegeben.", NamedTextColor.YELLOW));
+            return;
+        }
+        wave.forfeit();
+        player.sendMessage(Component.text(
+                "Welle " + session.activeWave + " aufgegeben — Gegner gewinnt diese Welle.",
+                NamedTextColor.YELLOW));
+        afterFinalise(player, session);
+    }
+
+    private void afterFinalise(Player player, GuiSession session) {
         if (session.team.wavesFinalised()) {
-            player.sendMessage(Component.text("Beide Wellen bestätigt.", NamedTextColor.GREEN));
+            player.sendMessage(Component.text("Beide Wellen abgeschlossen.", NamedTextColor.GREEN));
             sessions.remove(player.getUniqueId());
             player.closeInventory();
         } else {
             session.activeWave = session.activeWave == 1 ? 2 : 1;
-            refreshTitle(player, session);
+            renderInto(session);
         }
     }
 
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
+        GuiSession session = sessions.get(player.getUniqueId());
+        if (session == null) return;
+        if (event.getInventory() != session.inventory) return;
         sessions.remove(player.getUniqueId());
     }
 }

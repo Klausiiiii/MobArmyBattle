@@ -104,4 +104,60 @@ class WaveTest {
         assertThrows(UnsupportedOperationException.class,
                 () -> slots.add(new WaveSlot(SKELETON, 1)));
     }
+
+    @Test
+    void newWaveIsNotForfeited() {
+        Wave wave = new Wave();
+        assertFalse(wave.isForfeited());
+    }
+
+    @Test
+    void canForfeitEmptyWave() {
+        Wave wave = new Wave();
+
+        wave.forfeit();
+
+        assertTrue(wave.isForfeited());
+        assertTrue(wave.isFinalised());
+        assertEquals(0, wave.totalMobCount());
+    }
+
+    @Test
+    void forfeitClearsExistingMobs() {
+        Wave wave = new Wave();
+        wave.add(ZOMBIE, 5);
+
+        wave.forfeit();
+
+        assertTrue(wave.isForfeited());
+        assertEquals(0, wave.totalMobCount());
+    }
+
+    @Test
+    void cannotForfeitFinalisedWave() {
+        Wave wave = new Wave();
+        wave.add(ZOMBIE, 1);
+        wave.finalise();
+
+        assertThrows(IllegalStateException.class, wave::forfeit);
+    }
+
+    @Test
+    void cannotFinaliseTwice() {
+        Wave wave = new Wave();
+        wave.add(ZOMBIE, 1);
+        wave.finalise();
+
+        assertThrows(IllegalStateException.class, wave::finalise);
+    }
+
+    @Test
+    void finalisedNonForfeitedWaveIsNotForfeited() {
+        Wave wave = new Wave();
+        wave.add(ZOMBIE, 1);
+        wave.finalise();
+
+        assertFalse(wave.isForfeited());
+        assertTrue(wave.isFinalised());
+    }
 }

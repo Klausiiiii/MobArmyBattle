@@ -12,6 +12,7 @@ public class Wave {
 
     private final Map<MobEntry, Integer> slots = new LinkedHashMap<>();
     private boolean finalised = false;
+    private boolean forfeited = false;
 
     public void add(MobEntry entry, int count) {
         if (finalised) {
@@ -55,13 +56,29 @@ public class Wave {
     }
 
     public void finalise() {
+        if (finalised) {
+            throw new IllegalStateException("Welle ist bereits finalisiert");
+        }
         if (slots.isEmpty()) {
             throw new IllegalStateException("Welle braucht mind. 1 Mob");
         }
         finalised = true;
     }
 
+    public void forfeit() {
+        if (finalised) {
+            throw new IllegalStateException("Welle ist bereits finalisiert");
+        }
+        slots.clear();
+        finalised = true;
+        forfeited = true;
+    }
+
     public boolean isFinalised() {
         return finalised;
+    }
+
+    public boolean isForfeited() {
+        return forfeited;
     }
 }
