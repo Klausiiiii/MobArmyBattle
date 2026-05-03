@@ -17,13 +17,24 @@ public class MatchManager {
     private final AtomicLong matchIdCounter = new AtomicLong(1);
 
     public Match createMatch(UUID captainId) {
+        return createMatch(captainId, MatchMode.parse("1v1"));
+    }
+
+    public Match createMatch(UUID captainId, MatchMode mode) {
         if (matchByPlayer.containsKey(captainId)) {
             throw new IllegalStateException("Spieler ist bereits in einem Match: " + captainId);
         }
         String id = "match-" + matchIdCounter.getAndIncrement();
         long seed = new Random().nextLong();
-        Match match = new Match(id, seed);
-        match.addTeam(new Team(captainId));
+        Match match = new Match(id, seed, mode);
+
+        Team firstTeam = new Team(captainId, mode.getMaxSizeOfTeam(0));
+        match.addTeam(firstTeam);
+
+        for (int i = 1; i < mode.getTeamCount(); i++) {
+            match.addTeam(Team.empty(mode.getMaxSizeOfTeam(i)));
+        }
+
         matchesById.put(id, match);
         matchByPlayer.put(captainId, match);
         return match;
@@ -37,12 +48,47 @@ public class MatchManager {
         if (match == null) {
             throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
         }
-        Team captainsTeam = match.findTeamOf(captainId);
-        if (captainsTeam == null || !captainsTeam.getCaptainId().equals(captainId)) {
-            throw new IllegalArgumentException("Spieler " + captainId + " ist nicht Captain");
+        int target = pickAutoBalanceTeam(match);
+        joinMatch(playerId, captainId, target);
+    }
+
+    public void joinMatch(UUID playerId, UUID captainId, int teamIndex) {
+        if (matchByPlayer.containsKey(playerId)) {
+            throw new IllegalStateException("Spieler ist bereits in einem Match: " + playerId);
         }
-        captainsTeam.addMember(playerId);
+        Match match = matchByPlayer.get(captainId);
+        if (match == null) {
+            throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
+        }
+        if (teamIndex < 0 || teamIndex >= match.getTeams().size()) {
+            throw new IllegalArgumentException("Ungültiger Team-Index: " + teamIndex);
+        }
+        Team target = match.getTeams().get(teamIndex);
+        if (target.isFull()) {
+            throw new IllegalStateException("Team " + (teamIndex + 1) + " ist voll");
+        }
+        if (target.isDisbanded() || target.getCaptainId() == null) {
+            target.promoteEmpty(playerId);
+        } else {
+            target.addMember(playerId);
+        }
         matchByPlayer.put(playerId, match);
+    }
+
+    private int pickAutoBalanceTeam(Match match) {
+        int bestIdx = 0;
+        int bestSize = Integer.MAX_VALUE;
+        List<Team> teams = match.getTeams();
+        for (int i = 0; i < teams.size(); i++) {
+            Team t = teams.get(i);
+            if (t.isFull()) continue;
+            int size = (t.getCaptainId() == null) ? 0 : t.size();
+            if (size < bestSize) {
+                bestSize = size;
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
     }
 
     public void leaveMatch(UUID playerId) {

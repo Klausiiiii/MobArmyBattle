@@ -30,6 +30,38 @@ public class Team {
         this.maxSize = maxSize;
     }
 
+    /**
+     * Creates an empty team without a captain (placeholder for the second team
+     * in a multi-team match before anyone has joined it).
+     */
+    public static Team empty(int maxSize) {
+        return new Team(maxSize, true);
+    }
+
+    private Team(int maxSize, boolean emptySentinel) {
+        if (maxSize < 0) {
+            throw new IllegalArgumentException("maxSize darf nicht negativ sein");
+        }
+        this.captainId = null;
+        this.memberIds = new LinkedHashSet<>();
+        this.pool = new MobPool();
+        this.maxSize = maxSize;
+    }
+
+    /**
+     * Sets the captain on a previously empty team and adds them as the only member.
+     */
+    public void promoteEmpty(UUID newCaptainId) {
+        if (captainId != null && !memberIds.isEmpty()) {
+            throw new IllegalStateException("Team ist nicht leer");
+        }
+        if (newCaptainId == null) {
+            throw new IllegalArgumentException("newCaptainId darf nicht null sein");
+        }
+        this.captainId = newCaptainId;
+        this.memberIds.add(newCaptainId);
+    }
+
     public UUID getCaptainId() {
         return captainId;
     }
