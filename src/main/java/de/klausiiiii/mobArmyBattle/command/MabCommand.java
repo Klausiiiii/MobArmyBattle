@@ -51,7 +51,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase();
         try {
             switch (sub) {
-                case "create" -> handleCreate(player);
+                case "create" -> handleCreate(player, args);
                 case "join" -> handleJoin(player, args);
                 case "leave" -> handleLeave(player);
                 case "start" -> handleStart(player);
@@ -64,17 +64,36 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void handleCreate(Player player) {
-        Match match = matchManager.createMatch(player.getUniqueId());
-        player.sendMessage(Component.text("Match erstellt: " + match.getId() + ". Du bist Captain.",
+    private void handleCreate(Player player, String[] args) {
+        int maxTeamSize = 1;
+        if (args.length >= 2) {
+            try {
+                maxTeamSize = Integer.parseInt(args[1]);
+            } catch (NumberFormatException e) {
+                player.sendMessage(Component.text(
+                        "Ungültige max-team-size: " + args[1] + " (Zahl >= 1, z.B. 1, 2, 4)",
+                        NamedTextColor.RED));
+                return;
+            }
+            if (maxTeamSize < 1) {
+                player.sendMessage(Component.text(
+                        "max-team-size muss >= 1 sein.",
+                        NamedTextColor.RED));
+                return;
+            }
+        }
+        Match match = matchManager.createMatch(player.getUniqueId(), maxTeamSize);
+        player.sendMessage(Component.text(
+                "Match erstellt: " + match.getId() + " (max " + maxTeamSize + " pro Team). Du bist Captain Team 1.",
                 NamedTextColor.GREEN));
-        player.sendMessage(Component.text("Andere joinen mit: /mab join " + player.getName(),
+        player.sendMessage(Component.text(
+                "Andere joinen mit: /mab join " + player.getName() + " [team-nummer]",
                 NamedTextColor.GRAY));
     }
 
     private void handleJoin(Player player, String[] args) {
         if (args.length < 2) {
-            player.sendMessage(Component.text("Verwendung: /mab join <captain-name>", NamedTextColor.RED));
+            player.sendMessage(Component.text("Verwendung: /mab join <captain> [1|2]", NamedTextColor.RED));
             return;
         }
         Player captainPlayer = Bukkit.getPlayerExact(args[1]);
@@ -82,10 +101,28 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Spieler nicht online: " + args[1], NamedTextColor.RED));
             return;
         }
-        matchManager.joinMatch(player.getUniqueId(), captainPlayer.getUniqueId());
-        player.sendMessage(Component.text("Du bist " + captainPlayer.getName() + "s Match beigetreten.",
+        if (args.length >= 3) {
+            int teamIndex;
+            try {
+                teamIndex = Integer.parseInt(args[2]) - 1;
+            } catch (NumberFormatException e) {
+                player.sendMessage(Component.text(
+                        "Ungültiger Team-Index: " + args[2] + " (1 oder 2)",
+                        NamedTextColor.RED));
+                return;
+            }
+            matchManager.joinMatch(player.getUniqueId(), captainPlayer.getUniqueId(), teamIndex);
+        } else {
+            matchManager.joinMatch(player.getUniqueId(), captainPlayer.getUniqueId());
+        }
+        Match match = matchManager.getMatchOf(player.getUniqueId());
+        Team team = match.findTeamOf(player.getUniqueId());
+        int teamNumber = match.getTeams().indexOf(team) + 1;
+        player.sendMessage(Component.text(
+                "Du bist Team " + teamNumber + " in " + captainPlayer.getName() + "s Match beigetreten.",
                 NamedTextColor.GREEN));
-        captainPlayer.sendMessage(Component.text(player.getName() + " ist deinem Match beigetreten.",
+        captainPlayer.sendMessage(Component.text(
+                player.getName() + " ist Team " + teamNumber + " beigetreten.",
                 NamedTextColor.GREEN));
     }
 
@@ -114,6 +151,12 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         Team team = match.findTeamOf(playerId);
         if (!team.getCaptainId().equals(playerId)) {
             player.sendMessage(Component.text("Nur der Captain darf starten.", NamedTextColor.RED));
+            return;
+        }
+        if (!match.canStart()) {
+            player.sendMessage(Component.text(
+                    "Match kann nicht starten — beide Teams brauchen mindestens 1 Spieler.",
+                    NamedTextColor.RED));
             return;
         }
         match.transitionTo(new FarmPhase(plugin));
@@ -164,8 +207,8 @@ public class MabCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(Player player) {
         player.sendMessage(Component.text("MobArmyBattle-Befehle:", NamedTextColor.GOLD));
-        player.sendMessage(Component.text("/mab create — Match erstellen", NamedTextColor.GRAY));
-        player.sendMessage(Component.text("/mab join <captain> — Match beitreten", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab create [max-team-size] — Match erstellen (Default 1, max-Spieler pro Team)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab join <captain> [1|2] — Match beitreten", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leave — Match verlassen", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab start — Match starten (nur Captain)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab pool — Team-Pool anzeigen", NamedTextColor.GRAY));
@@ -191,6 +234,13 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 }
             }
             return filterByPrefix(captainNames, args[1]);
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("create")) {
+            return filterByPrefix(List.of("1", "2", "3", "4"), args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("join")) {
+            return filterByPrefix(List.of("1", "2", "3", "4", "5", "6", "7", "8"), args[2]);
         }
 
         return Collections.emptyList();

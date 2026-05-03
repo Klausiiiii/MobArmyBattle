@@ -13,20 +13,29 @@ import java.util.UUID;
 public class Match {
     private final String id;
     private final long seed;
+    private final int maxTeamSize;
     private final List<Team> teams;
     private final Map<Team, String> farmWorldNames;
     private MatchPhase currentPhase;
 
     public Match(String id) {
-        this(id, new Random().nextLong());
+        this(id, new Random().nextLong(), 1);
     }
 
     public Match(String id, long seed) {
+        this(id, seed, 1);
+    }
+
+    public Match(String id, long seed, int maxTeamSize) {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("Match-ID darf nicht leer sein");
         }
+        if (maxTeamSize < 1) {
+            throw new IllegalArgumentException("maxTeamSize muss >= 1 sein");
+        }
         this.id = id;
         this.seed = seed;
+        this.maxTeamSize = maxTeamSize;
         this.teams = new ArrayList<>();
         this.farmWorldNames = new HashMap<>();
         this.currentPhase = new LobbyPhase();
@@ -39,6 +48,10 @@ public class Match {
 
     public long getSeed() {
         return seed;
+    }
+
+    public int getMaxTeamSize() {
+        return maxTeamSize;
     }
 
     public List<Team> getTeams() {
@@ -72,6 +85,16 @@ public class Match {
 
     public Map<Team, String> getAllFarmWorldNames() {
         return Collections.unmodifiableMap(farmWorldNames);
+    }
+
+    public boolean canStart() {
+        int activeTeams = 0;
+        for (Team t : teams) {
+            if (!t.isDisbanded() && t.size() > 0) {
+                activeTeams++;
+            }
+        }
+        return activeTeams >= 2;
     }
 
     public void transitionTo(MatchPhase newPhase) {
