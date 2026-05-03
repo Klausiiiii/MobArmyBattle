@@ -10,15 +10,24 @@ public class Team {
     private UUID captainId;
     private final Set<UUID> memberIds;
     private final MobPool pool;
+    private final int maxSize;
 
     public Team(UUID captainId) {
+        this(captainId, 0);
+    }
+
+    public Team(UUID captainId, int maxSize) {
         if (captainId == null) {
             throw new IllegalArgumentException("captainId darf nicht null sein");
+        }
+        if (maxSize < 0) {
+            throw new IllegalArgumentException("maxSize darf nicht negativ sein");
         }
         this.captainId = captainId;
         this.memberIds = new LinkedHashSet<>();
         this.memberIds.add(captainId);
         this.pool = new MobPool();
+        this.maxSize = maxSize;
     }
 
     public UUID getCaptainId() {
@@ -41,6 +50,9 @@ public class Team {
         if (memberIds.contains(playerId)) {
             throw new IllegalArgumentException("Spieler ist bereits Team-Mitglied: " + playerId);
         }
+        if (maxSize > 0 && memberIds.size() >= maxSize) {
+            throw new IllegalStateException("Team ist voll: " + maxSize + " Mitglieder");
+        }
         memberIds.add(playerId);
     }
 
@@ -60,6 +72,14 @@ public class Team {
 
     public int size() {
         return memberIds.size();
+    }
+
+    public int getMaxSize() {
+        return maxSize;
+    }
+
+    public boolean isFull() {
+        return maxSize > 0 && memberIds.size() >= maxSize;
     }
 
     public boolean isDisbanded() {

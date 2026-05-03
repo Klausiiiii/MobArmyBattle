@@ -119,4 +119,47 @@ class TeamTest {
         assertNotNull(team.getPool());
         assertEquals(0, team.getPool().totalCount());
     }
+
+    @Test
+    void teamWithMaxSizeRejectsOverflow() {
+        UUID captain = UUID.randomUUID();
+        Team team = new Team(captain, 2);
+
+        team.addMember(UUID.randomUUID());
+
+        assertThrows(IllegalStateException.class,
+                () -> team.addMember(UUID.randomUUID()));
+    }
+
+    @Test
+    void teamReportsFullWhenAtMaxSize() {
+        UUID captain = UUID.randomUUID();
+        Team team = new Team(captain, 2);
+
+        assertFalse(team.isFull());
+
+        team.addMember(UUID.randomUUID());
+
+        assertTrue(team.isFull());
+    }
+
+    @Test
+    void teamWithoutMaxSizeNeverFull() {
+        Team team = new Team(UUID.randomUUID());
+        for (int i = 0; i < 100; i++) team.addMember(UUID.randomUUID());
+
+        assertFalse(team.isFull());
+    }
+
+    @Test
+    void getMaxSizeReturnsZeroForUnboundedTeam() {
+        Team team = new Team(UUID.randomUUID());
+        assertEquals(0, team.getMaxSize());
+    }
+
+    @Test
+    void getMaxSizeReturnsBoundForBoundedTeam() {
+        Team team = new Team(UUID.randomUUID(), 3);
+        assertEquals(3, team.getMaxSize());
+    }
 }
