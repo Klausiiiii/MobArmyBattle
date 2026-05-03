@@ -17,13 +17,20 @@ public class MatchManager {
     private final AtomicLong matchIdCounter = new AtomicLong(1);
 
     public Match createMatch(UUID captainId) {
+        return createMatch(captainId, 1);
+    }
+
+    public Match createMatch(UUID captainId, int maxTeamSize) {
         if (matchByPlayer.containsKey(captainId)) {
             throw new IllegalStateException("Spieler ist bereits in einem Match: " + captainId);
         }
+        if (maxTeamSize < 1) {
+            throw new IllegalArgumentException("maxTeamSize muss >= 1 sein");
+        }
         String id = "match-" + matchIdCounter.getAndIncrement();
         long seed = new Random().nextLong();
-        Match match = new Match(id, seed);
-        match.addTeam(new Team(captainId));
+        Match match = new Match(id, seed, maxTeamSize);
+        match.addTeam(new Team(captainId, maxTeamSize));
         matchesById.put(id, match);
         matchByPlayer.put(captainId, match);
         return match;
@@ -37,12 +44,62 @@ public class MatchManager {
         if (match == null) {
             throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
         }
-        Team captainsTeam = match.findTeamOf(captainId);
-        if (captainsTeam == null || !captainsTeam.getCaptainId().equals(captainId)) {
-            throw new IllegalArgumentException("Spieler " + captainId + " ist nicht Captain");
+        int target = pickAutoBalanceTeam(match);
+        joinAt(match, playerId, target);
+    }
+
+    public void joinMatch(UUID playerId, UUID captainId, int teamIndex) {
+        if (matchByPlayer.containsKey(playerId)) {
+            throw new IllegalStateException("Spieler ist bereits in einem Match: " + playerId);
         }
-        captainsTeam.addMember(playerId);
+        Match match = matchByPlayer.get(captainId);
+        if (match == null) {
+            throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
+        }
+        int teamCount = match.getTeams().size();
+        if (teamIndex < 0 || teamIndex > teamCount) {
+            throw new IllegalArgumentException("Ungültiger Team-Index: " + teamIndex);
+        }
+        joinAt(match, playerId, teamIndex);
+    }
+
+    private void joinAt(Match match, UUID playerId, int teamIndex) {
+        if (teamIndex == match.getTeams().size()) {
+            // Create a new team with the joiner as its captain
+            match.addTeam(new Team(playerId, match.getMaxTeamSize()));
+            matchByPlayer.put(playerId, match);
+            return;
+        }
+        Team target = match.getTeams().get(teamIndex);
+        if (target.isFull()) {
+            throw new IllegalStateException("Team " + (teamIndex + 1) + " ist voll");
+        }
+        if (target.isDisbanded() || target.getCaptainId() == null) {
+            target.promoteEmpty(playerId);
+        } else {
+            target.addMember(playerId);
+        }
         matchByPlayer.put(playerId, match);
+    }
+
+    private int pickAutoBalanceTeam(Match match) {
+        List<Team> teams = match.getTeams();
+        int bestIdx = -1;
+        int bestSize = Integer.MAX_VALUE;
+        for (int i = 0; i < teams.size(); i++) {
+            Team t = teams.get(i);
+            if (t.isFull()) continue;
+            int size = (t.getCaptainId() == null) ? 0 : t.size();
+            if (size < bestSize) {
+                bestSize = size;
+                bestIdx = i;
+            }
+        }
+        if (bestIdx == -1) {
+            // All teams are full -> new team
+            return teams.size();
+        }
+        return bestIdx;
     }
 
     public void leaveMatch(UUID playerId) {
@@ -51,24 +108,43 @@ public class MatchManager {
             return;
         }
         Team team = match.findTeamOf(playerId);
-        boolean wasCaptain = team.getCaptainId().equals(playerId);
-
-        if (wasCaptain) {
-            UUID nextCaptain = team.getMemberIds().stream()
-                    .filter(id -> !id.equals(playerId))
-                    .findFirst()
-                    .orElse(null);
-            if (nextCaptain != null) {
-                team.promoteToCaptain(nextCaptain);
-                team.removeMember(playerId);
-            } else {
-                team.disband();
-            }
-        } else {
-            team.removeMember(playerId);
-        }
         matchByPlayer.remove(playerId);
 
+        if (team != null) {
+            UUID captainId = team.getCaptainId();
+            boolean wasCaptain = captainId != null && captainId.equals(playerId);
+
+            if (wasCaptain) {
+                UUID nextCaptain = team.getMemberIds().stream()
+                        .filter(id -> !id.equals(playerId))
+                        .findFirst()
+                        .orElse(null);
+                if (nextCaptain != null) {
+                    team.promoteToCaptain(nextCaptain);
+                    team.removeMember(playerId);
+                } else {
+                    team.disband();
+                }
+            } else if (team.hasMember(playerId)) {
+                team.removeMember(playerId);
+            }
+        }
+
+        boolean stillHasPlayers = matchByPlayer.values().stream()
+                .anyMatch(m -> m == match);
+        if (!stillHasPlayers) {
+            matchesById.remove(match.getId());
+        }
+    }
+
+    /**
+     * Removes a player from match-tracking without going through team-cleanup.
+     * Used during forced cleanup (e.g. FinishedPhase) where the team state is
+     * being torn down by the caller.
+     */
+    public void forceRemove(UUID playerId) {
+        Match match = matchByPlayer.remove(playerId);
+        if (match == null) return;
         boolean stillHasPlayers = matchByPlayer.values().stream()
                 .anyMatch(m -> m == match);
         if (!stillHasPlayers) {

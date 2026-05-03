@@ -134,4 +134,63 @@ class MatchTest {
         Match match = new Match("test-match-1");
         assertNotNull(match.getId());
     }
+
+    @Test
+    void usesDefaultMaxTeamSize1() {
+        Match m1 = new Match("test-match-1");
+        Match m2 = new Match("test-match-2", 42L);
+        assertEquals(1, m1.getMaxTeamSize());
+        assertEquals(1, m2.getMaxTeamSize());
+    }
+
+    @Test
+    void matchHasMaxTeamSize() {
+        Match match = new Match("test-match-1", 0L, 4);
+        assertEquals(4, match.getMaxTeamSize());
+    }
+
+    @Test
+    void rejectsMaxTeamSizeBelow1() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Match("test-match-1", 0L, 0));
+    }
+
+    @Test
+    void canStartReturnsFalseWhenOnlyOneTeamHasPlayers() {
+        Match match = new Match("test-match-1", 0L, 2);
+        match.addTeam(new Team(UUID.randomUUID(), 2));
+
+        assertFalse(match.canStart());
+    }
+
+    @Test
+    void canStartReturnsTrueWithTwoActiveTeams() {
+        Match match = new Match("test-match-1", 0L, 2);
+        match.addTeam(new Team(UUID.randomUUID(), 2));
+        match.addTeam(new Team(UUID.randomUUID(), 2));
+
+        assertTrue(match.canStart());
+    }
+
+    @Test
+    void canStartReturnsFalseWhenSecondTeamWasDisbanded() {
+        Match match = new Match("test-match-1", 0L, 1);
+        Team team1 = new Team(UUID.randomUUID(), 1);
+        Team team2 = new Team(UUID.randomUUID(), 1);
+        match.addTeam(team1);
+        match.addTeam(team2);
+        team2.disband();
+
+        assertFalse(match.canStart());
+    }
+
+    @Test
+    void canStartReturnsTrueWithThreeActiveTeams() {
+        Match match = new Match("test-match-1", 0L, 1);
+        match.addTeam(new Team(UUID.randomUUID(), 1));
+        match.addTeam(new Team(UUID.randomUUID(), 1));
+        match.addTeam(new Team(UUID.randomUUID(), 1));
+
+        assertTrue(match.canStart());
+    }
 }

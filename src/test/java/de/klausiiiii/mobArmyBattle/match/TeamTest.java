@@ -119,4 +119,74 @@ class TeamTest {
         assertNotNull(team.getPool());
         assertEquals(0, team.getPool().totalCount());
     }
+
+    @Test
+    void teamWithMaxSizeRejectsOverflow() {
+        UUID captain = UUID.randomUUID();
+        Team team = new Team(captain, 2);
+
+        team.addMember(UUID.randomUUID());
+
+        assertThrows(IllegalStateException.class,
+                () -> team.addMember(UUID.randomUUID()));
+    }
+
+    @Test
+    void teamReportsFullWhenAtMaxSize() {
+        UUID captain = UUID.randomUUID();
+        Team team = new Team(captain, 2);
+
+        assertFalse(team.isFull());
+
+        team.addMember(UUID.randomUUID());
+
+        assertTrue(team.isFull());
+    }
+
+    @Test
+    void teamWithoutMaxSizeNeverFull() {
+        Team team = new Team(UUID.randomUUID());
+        for (int i = 0; i < 100; i++) team.addMember(UUID.randomUUID());
+
+        assertFalse(team.isFull());
+    }
+
+    @Test
+    void getMaxSizeReturnsZeroForUnboundedTeam() {
+        Team team = new Team(UUID.randomUUID());
+        assertEquals(0, team.getMaxSize());
+    }
+
+    @Test
+    void getMaxSizeReturnsBoundForBoundedTeam() {
+        Team team = new Team(UUID.randomUUID(), 3);
+        assertEquals(3, team.getMaxSize());
+    }
+
+    @Test
+    void newTeamHasTwoEmptyWaves() {
+        Team team = new Team(UUID.randomUUID());
+
+        assertNotNull(team.getWave1());
+        assertNotNull(team.getWave2());
+        assertEquals(0, team.getWave1().totalMobCount());
+        assertEquals(0, team.getWave2().totalMobCount());
+    }
+
+    @Test
+    void wavesFinalisedReturnsTrueOnlyWhenBothFinalised() {
+        Team team = new Team(UUID.randomUUID());
+        de.klausiiiii.mobArmyBattle.pool.MobEntry zombie =
+                new de.klausiiiii.mobArmyBattle.pool.MobEntry("ZOMBIE", "none|none|none|none|none|none");
+
+        assertFalse(team.wavesFinalised());
+
+        team.getWave1().add(zombie, 1);
+        team.getWave1().finalise();
+        assertFalse(team.wavesFinalised());
+
+        team.getWave2().add(zombie, 1);
+        team.getWave2().finalise();
+        assertTrue(team.wavesFinalised());
+    }
 }

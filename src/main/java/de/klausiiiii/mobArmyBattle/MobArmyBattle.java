@@ -5,6 +5,7 @@ import de.klausiiiii.mobArmyBattle.listener.MobKillListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerConnectionListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerDeathFarmListener;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
+import de.klausiiiii.mobArmyBattle.wave.WaveBuildGui;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -13,6 +14,7 @@ public final class MobArmyBattle extends JavaPlugin {
 
     private MatchManager matchManager;
     private WorldManager worldManager;
+    private WaveBuildGui waveBuildGui;
 
     @Override
     public void onEnable() {
@@ -39,6 +41,11 @@ public final class MobArmyBattle extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new PlayerDeathFarmListener(matchManager), this);
 
+        waveBuildGui = new WaveBuildGui(matchManager);
+        getServer().getPluginManager().registerEvents(waveBuildGui, this);
+
+        getServer().getScheduler().runTaskTimer(this, () -> matchManager.tickAll(), 20L, 20L);
+
         getLogger().info("MobArmyBattle aktiviert.");
     }
 
@@ -53,5 +60,9 @@ public final class MobArmyBattle extends JavaPlugin {
 
     public WorldManager getWorldManager() {
         return worldManager;
+    }
+
+    public WaveBuildGui getWaveBuildGui() {
+        return waveBuildGui;
     }
 }

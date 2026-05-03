@@ -1,6 +1,7 @@
 package de.klausiiiii.mobArmyBattle.match;
 
 import de.klausiiiii.mobArmyBattle.pool.MobPool;
+import de.klausiiiii.mobArmyBattle.wave.Wave;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -10,15 +11,62 @@ public class Team {
     private UUID captainId;
     private final Set<UUID> memberIds;
     private final MobPool pool;
+    private final int maxSize;
+    private final Wave wave1;
+    private final Wave wave2;
 
     public Team(UUID captainId) {
+        this(captainId, 0);
+    }
+
+    public Team(UUID captainId, int maxSize) {
         if (captainId == null) {
             throw new IllegalArgumentException("captainId darf nicht null sein");
+        }
+        if (maxSize < 0) {
+            throw new IllegalArgumentException("maxSize darf nicht negativ sein");
         }
         this.captainId = captainId;
         this.memberIds = new LinkedHashSet<>();
         this.memberIds.add(captainId);
         this.pool = new MobPool();
+        this.maxSize = maxSize;
+        this.wave1 = new Wave();
+        this.wave2 = new Wave();
+    }
+
+    /**
+     * Creates an empty team without a captain (placeholder for the second team
+     * in a multi-team match before anyone has joined it).
+     */
+    public static Team empty(int maxSize) {
+        return new Team(maxSize, true);
+    }
+
+    private Team(int maxSize, boolean emptySentinel) {
+        if (maxSize < 0) {
+            throw new IllegalArgumentException("maxSize darf nicht negativ sein");
+        }
+        this.captainId = null;
+        this.memberIds = new LinkedHashSet<>();
+        this.pool = new MobPool();
+        this.maxSize = maxSize;
+        this.wave1 = new Wave();
+        this.wave2 = new Wave();
+    }
+
+    /**
+     * Sets the captain on a previously empty team and adds them as the only member.
+     */
+    public void promoteEmpty(UUID newCaptainId) {
+        if (captainId != null && !memberIds.isEmpty()) {
+            throw new IllegalStateException("Team ist nicht leer");
+        }
+        if (newCaptainId == null) {
+            throw new IllegalArgumentException("newCaptainId darf nicht null sein");
+        }
+        this.captainId = newCaptainId;
+        this.memberIds.add(newCaptainId);
     }
 
     public UUID getCaptainId() {
@@ -41,6 +89,9 @@ public class Team {
         if (memberIds.contains(playerId)) {
             throw new IllegalArgumentException("Spieler ist bereits Team-Mitglied: " + playerId);
         }
+        if (maxSize > 0 && memberIds.size() >= maxSize) {
+            throw new IllegalStateException("Team ist voll: " + maxSize + " Mitglieder");
+        }
         memberIds.add(playerId);
     }
 
@@ -60,6 +111,26 @@ public class Team {
 
     public int size() {
         return memberIds.size();
+    }
+
+    public int getMaxSize() {
+        return maxSize;
+    }
+
+    public boolean isFull() {
+        return maxSize > 0 && memberIds.size() >= maxSize;
+    }
+
+    public Wave getWave1() {
+        return wave1;
+    }
+
+    public Wave getWave2() {
+        return wave2;
+    }
+
+    public boolean wavesFinalised() {
+        return wave1.isFinalised() && wave2.isFinalised();
     }
 
     public boolean isDisbanded() {
