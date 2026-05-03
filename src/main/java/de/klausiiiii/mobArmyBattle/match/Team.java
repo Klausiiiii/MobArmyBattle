@@ -1,5 +1,6 @@
 package de.klausiiiii.mobArmyBattle.match;
 
+import de.klausiiiii.mobArmyBattle.pool.MobPool;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -8,6 +9,7 @@ import java.util.Collections;
 public class Team {
     private UUID captainId;
     private final Set<UUID> memberIds;
+    private final MobPool pool;
 
     public Team(UUID captainId) {
         if (captainId == null) {
@@ -16,6 +18,7 @@ public class Team {
         this.captainId = captainId;
         this.memberIds = new LinkedHashSet<>();
         this.memberIds.add(captainId);
+        this.pool = new MobPool();
     }
 
     public UUID getCaptainId() {
@@ -24,6 +27,10 @@ public class Team {
 
     public Set<UUID> getMemberIds() {
         return Collections.unmodifiableSet(memberIds);
+    }
+
+    public MobPool getPool() {
+        return pool;
     }
 
     public boolean hasMember(UUID playerId) {
