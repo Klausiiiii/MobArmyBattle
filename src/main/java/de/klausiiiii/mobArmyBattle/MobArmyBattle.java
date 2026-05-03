@@ -1,6 +1,7 @@
 package de.klausiiiii.mobArmyBattle;
 
 import de.klausiiiii.mobArmyBattle.command.MabCommand;
+import de.klausiiiii.mobArmyBattle.listener.PlayerConnectionListener;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.command.PluginCommand;
@@ -14,6 +15,9 @@ public final class MobArmyBattle extends JavaPlugin {
     @Override
     public void onEnable() {
         worldManager = new WorldManager(this);
+        worldManager.cleanupOrphanWorlds();
+        worldManager.getOrCreateLobbyWorld();
+
         matchManager = new MatchManager();
 
         PluginCommand mabCmd = getCommand("mab");
@@ -22,9 +26,12 @@ public final class MobArmyBattle extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        MabCommand mabHandler = new MabCommand(matchManager);
+        MabCommand mabHandler = new MabCommand(this, matchManager);
         mabCmd.setExecutor(mabHandler);
         mabCmd.setTabCompleter(mabHandler);
+
+        getServer().getPluginManager().registerEvents(
+                new PlayerConnectionListener(matchManager, worldManager), this);
 
         getLogger().info("MobArmyBattle aktiviert.");
     }
