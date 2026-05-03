@@ -3,7 +3,6 @@ package de.klausiiiii.mobArmyBattle.command;
 import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
-import de.klausiiiii.mobArmyBattle.match.MatchMode;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
 import de.klausiiiii.mobArmyBattle.match.phase.FarmPhase;
@@ -66,25 +65,29 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleCreate(Player player, String[] args) {
-        MatchMode mode;
-        if (args.length < 2) {
-            mode = MatchMode.parse("1v1");
-        } else {
+        int maxTeamSize = 1;
+        if (args.length >= 2) {
             try {
-                mode = MatchMode.parse(args[1]);
-            } catch (IllegalArgumentException e) {
+                maxTeamSize = Integer.parseInt(args[1]);
+            } catch (NumberFormatException e) {
                 player.sendMessage(Component.text(
-                        "Ungültiger Modus: " + args[1] + " (z.B. 1v1, 2v2, 4v4, 2v3)",
+                        "Ungültige max-team-size: " + args[1] + " (Zahl >= 1, z.B. 1, 2, 4)",
+                        NamedTextColor.RED));
+                return;
+            }
+            if (maxTeamSize < 1) {
+                player.sendMessage(Component.text(
+                        "max-team-size muss >= 1 sein.",
                         NamedTextColor.RED));
                 return;
             }
         }
-        Match match = matchManager.createMatch(player.getUniqueId(), mode);
+        Match match = matchManager.createMatch(player.getUniqueId(), maxTeamSize);
         player.sendMessage(Component.text(
-                "Match erstellt: " + match.getId() + " (" + mode.getDisplayName() + "). Du bist Captain Team 1.",
+                "Match erstellt: " + match.getId() + " (max " + maxTeamSize + " pro Team). Du bist Captain Team 1.",
                 NamedTextColor.GREEN));
         player.sendMessage(Component.text(
-                "Andere joinen mit: /mab join " + player.getName() + " [1|2]",
+                "Andere joinen mit: /mab join " + player.getName() + " [team-nummer]",
                 NamedTextColor.GRAY));
     }
 
@@ -204,7 +207,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(Player player) {
         player.sendMessage(Component.text("MobArmyBattle-Befehle:", NamedTextColor.GOLD));
-        player.sendMessage(Component.text("/mab create [mode] — Match erstellen (Default 1v1, z.B. 2v2)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab create [max-team-size] — Match erstellen (Default 1, max-Spieler pro Team)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab join <captain> [1|2] — Match beitreten", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leave — Match verlassen", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab start — Match starten (nur Captain)", NamedTextColor.GRAY));
@@ -234,10 +237,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && args[0].equalsIgnoreCase("create")) {
-            return filterByPrefix(List.of("1v1", "2v2", "3v3", "4v4", "2v3", "3v4"), args[1]);
+            return filterByPrefix(List.of("1", "2", "3", "4"), args[1]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("join")) {
-            return filterByPrefix(List.of("1", "2"), args[2]);
+            return filterByPrefix(List.of("1", "2", "3", "4", "5", "6", "7", "8"), args[2]);
         }
 
         return Collections.emptyList();

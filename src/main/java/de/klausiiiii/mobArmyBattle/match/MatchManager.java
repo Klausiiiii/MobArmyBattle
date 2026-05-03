@@ -17,24 +17,20 @@ public class MatchManager {
     private final AtomicLong matchIdCounter = new AtomicLong(1);
 
     public Match createMatch(UUID captainId) {
-        return createMatch(captainId, MatchMode.parse("1v1"));
+        return createMatch(captainId, 1);
     }
 
-    public Match createMatch(UUID captainId, MatchMode mode) {
+    public Match createMatch(UUID captainId, int maxTeamSize) {
         if (matchByPlayer.containsKey(captainId)) {
             throw new IllegalStateException("Spieler ist bereits in einem Match: " + captainId);
         }
+        if (maxTeamSize < 1) {
+            throw new IllegalArgumentException("maxTeamSize muss >= 1 sein");
+        }
         String id = "match-" + matchIdCounter.getAndIncrement();
         long seed = new Random().nextLong();
-        Match match = new Match(id, seed, mode);
-
-        Team firstTeam = new Team(captainId, mode.getMaxSizeOfTeam(0));
-        match.addTeam(firstTeam);
-
-        for (int i = 1; i < mode.getTeamCount(); i++) {
-            match.addTeam(Team.empty(mode.getMaxSizeOfTeam(i)));
-        }
-
+        Match match = new Match(id, seed, maxTeamSize);
+        match.addTeam(new Team(captainId, maxTeamSize));
         matchesById.put(id, match);
         matchByPlayer.put(captainId, match);
         return match;
@@ -49,7 +45,7 @@ public class MatchManager {
             throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
         }
         int target = pickAutoBalanceTeam(match);
-        joinMatch(playerId, captainId, target);
+        joinAt(match, playerId, target);
     }
 
     public void joinMatch(UUID playerId, UUID captainId, int teamIndex) {
@@ -60,8 +56,19 @@ public class MatchManager {
         if (match == null) {
             throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
         }
-        if (teamIndex < 0 || teamIndex >= match.getTeams().size()) {
+        int teamCount = match.getTeams().size();
+        if (teamIndex < 0 || teamIndex > teamCount) {
             throw new IllegalArgumentException("Ungültiger Team-Index: " + teamIndex);
+        }
+        joinAt(match, playerId, teamIndex);
+    }
+
+    private void joinAt(Match match, UUID playerId, int teamIndex) {
+        if (teamIndex == match.getTeams().size()) {
+            // Create a new team with the joiner as its captain
+            match.addTeam(new Team(playerId, match.getMaxTeamSize()));
+            matchByPlayer.put(playerId, match);
+            return;
         }
         Team target = match.getTeams().get(teamIndex);
         if (target.isFull()) {
@@ -76,9 +83,9 @@ public class MatchManager {
     }
 
     private int pickAutoBalanceTeam(Match match) {
-        int bestIdx = 0;
-        int bestSize = Integer.MAX_VALUE;
         List<Team> teams = match.getTeams();
+        int bestIdx = -1;
+        int bestSize = Integer.MAX_VALUE;
         for (int i = 0; i < teams.size(); i++) {
             Team t = teams.get(i);
             if (t.isFull()) continue;
@@ -87,6 +94,10 @@ public class MatchManager {
                 bestSize = size;
                 bestIdx = i;
             }
+        }
+        if (bestIdx == -1) {
+            // All teams are full -> new team
+            return teams.size();
         }
         return bestIdx;
     }

@@ -13,29 +13,29 @@ import java.util.UUID;
 public class Match {
     private final String id;
     private final long seed;
-    private final MatchMode mode;
+    private final int maxTeamSize;
     private final List<Team> teams;
     private final Map<Team, String> farmWorldNames;
     private MatchPhase currentPhase;
 
     public Match(String id) {
-        this(id, new Random().nextLong(), MatchMode.parse("1v1"));
+        this(id, new Random().nextLong(), 1);
     }
 
     public Match(String id, long seed) {
-        this(id, seed, MatchMode.parse("1v1"));
+        this(id, seed, 1);
     }
 
-    public Match(String id, long seed, MatchMode mode) {
+    public Match(String id, long seed, int maxTeamSize) {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("Match-ID darf nicht leer sein");
         }
-        if (mode == null) {
-            throw new IllegalArgumentException("MatchMode darf nicht null sein");
+        if (maxTeamSize < 1) {
+            throw new IllegalArgumentException("maxTeamSize muss >= 1 sein");
         }
         this.id = id;
         this.seed = seed;
-        this.mode = mode;
+        this.maxTeamSize = maxTeamSize;
         this.teams = new ArrayList<>();
         this.farmWorldNames = new HashMap<>();
         this.currentPhase = new LobbyPhase();
@@ -50,20 +50,12 @@ public class Match {
         return seed;
     }
 
-    public MatchMode getMode() {
-        return mode;
+    public int getMaxTeamSize() {
+        return maxTeamSize;
     }
 
     public List<Team> getTeams() {
         return Collections.unmodifiableList(teams);
-    }
-
-    public boolean canStart() {
-        if (teams.size() < mode.getTeamCount()) return false;
-        for (Team t : teams) {
-            if (t.isDisbanded() || t.size() == 0) return false;
-        }
-        return true;
     }
 
     public MatchPhase getCurrentPhase() {
@@ -93,6 +85,16 @@ public class Match {
 
     public Map<Team, String> getAllFarmWorldNames() {
         return Collections.unmodifiableMap(farmWorldNames);
+    }
+
+    public boolean canStart() {
+        int activeTeams = 0;
+        for (Team t : teams) {
+            if (!t.isDisbanded() && t.size() > 0) {
+                activeTeams++;
+            }
+        }
+        return activeTeams >= 2;
     }
 
     public void transitionTo(MatchPhase newPhase) {
