@@ -131,6 +131,35 @@ class MatchManagerTest {
     }
 
     @Test
+    void getCaptainIdsReturnsAllActiveCaptains() {
+        MatchManager manager = new MatchManager();
+        UUID captain1 = UUID.randomUUID();
+        UUID captain2 = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(captain1);
+        manager.createMatch(captain2);
+        manager.joinMatch(joiner, captain1);
+
+        java.util.Set<UUID> captains = manager.getCaptainIds();
+
+        assertEquals(2, captains.size());
+        assertTrue(captains.contains(captain1));
+        assertTrue(captains.contains(captain2));
+        assertFalse(captains.contains(joiner));
+    }
+
+    @Test
+    void getCaptainIdsExcludesDisbandedTeams() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        manager.createMatch(captain);
+
+        manager.leaveMatch(captain);
+
+        assertTrue(manager.getCaptainIds().isEmpty());
+    }
+
+    @Test
     void leavingAsSoloCaptainDisbandsTeam() {
         MatchManager manager = new MatchManager();
         UUID captain = UUID.randomUUID();

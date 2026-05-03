@@ -19,7 +19,9 @@ public final class MobArmyBattle extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        mabCmd.setExecutor(new MabCommand(matchManager));
+        MabCommand mabHandler = new MabCommand(matchManager);
+        mabCmd.setExecutor(mabHandler);
+        mabCmd.setTabCompleter(mabHandler);
 
         getLogger().info("MobArmyBattle aktiviert.");
     }

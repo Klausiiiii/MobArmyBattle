@@ -3,8 +3,10 @@ package de.klausiiiii.mobArmyBattle.match;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -82,6 +84,19 @@ public class MatchManager {
 
     public List<Match> getActiveMatches() {
         return Collections.unmodifiableList(new ArrayList<>(matchesById.values()));
+    }
+
+    public Set<UUID> getCaptainIds() {
+        Set<UUID> captains = new LinkedHashSet<>();
+        for (Match match : matchesById.values()) {
+            for (Team team : match.getTeams()) {
+                UUID cap = team.getCaptainId();
+                if (cap != null) {
+                    captains.add(cap);
+                }
+            }
+        }
+        return Collections.unmodifiableSet(captains);
     }
 
     public void tickAll() {

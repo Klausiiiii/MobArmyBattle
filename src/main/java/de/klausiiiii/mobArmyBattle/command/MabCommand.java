@@ -11,12 +11,20 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
-public class MabCommand implements CommandExecutor {
+public class MabCommand implements CommandExecutor, TabCompleter {
+
+    private static final List<String> SUBCOMMANDS = List.of("create", "join", "leave", "start");
 
     private final MatchManager matchManager;
 
@@ -122,5 +130,41 @@ public class MabCommand implements CommandExecutor {
         player.sendMessage(Component.text("/mab join <captain> — Match beitreten", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leave — Match verlassen", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab start — Match starten (nur Captain)", NamedTextColor.GRAY));
+    }
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                                @NotNull String alias, @NotNull String[] args) {
+        if (!(sender instanceof Player)) {
+            return Collections.emptyList();
+        }
+
+        if (args.length == 1) {
+            return filterByPrefix(SUBCOMMANDS, args[0]);
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("join")) {
+            List<String> captainNames = new ArrayList<>();
+            for (UUID captainId : matchManager.getCaptainIds()) {
+                Player captain = Bukkit.getPlayer(captainId);
+                if (captain != null && captain != sender) {
+                    captainNames.add(captain.getName());
+                }
+            }
+            return filterByPrefix(captainNames, args[1]);
+        }
+
+        return Collections.emptyList();
+    }
+
+    private List<String> filterByPrefix(List<String> options, String prefix) {
+        String lower = prefix.toLowerCase(Locale.ROOT);
+        List<String> result = new ArrayList<>();
+        for (String opt : options) {
+            if (opt.toLowerCase(Locale.ROOT).startsWith(lower)) {
+                result.add(opt);
+            }
+        }
+        return result;
     }
 }
