@@ -108,24 +108,43 @@ public class MatchManager {
             return;
         }
         Team team = match.findTeamOf(playerId);
-        boolean wasCaptain = team.getCaptainId().equals(playerId);
-
-        if (wasCaptain) {
-            UUID nextCaptain = team.getMemberIds().stream()
-                    .filter(id -> !id.equals(playerId))
-                    .findFirst()
-                    .orElse(null);
-            if (nextCaptain != null) {
-                team.promoteToCaptain(nextCaptain);
-                team.removeMember(playerId);
-            } else {
-                team.disband();
-            }
-        } else {
-            team.removeMember(playerId);
-        }
         matchByPlayer.remove(playerId);
 
+        if (team != null) {
+            UUID captainId = team.getCaptainId();
+            boolean wasCaptain = captainId != null && captainId.equals(playerId);
+
+            if (wasCaptain) {
+                UUID nextCaptain = team.getMemberIds().stream()
+                        .filter(id -> !id.equals(playerId))
+                        .findFirst()
+                        .orElse(null);
+                if (nextCaptain != null) {
+                    team.promoteToCaptain(nextCaptain);
+                    team.removeMember(playerId);
+                } else {
+                    team.disband();
+                }
+            } else if (team.hasMember(playerId)) {
+                team.removeMember(playerId);
+            }
+        }
+
+        boolean stillHasPlayers = matchByPlayer.values().stream()
+                .anyMatch(m -> m == match);
+        if (!stillHasPlayers) {
+            matchesById.remove(match.getId());
+        }
+    }
+
+    /**
+     * Removes a player from match-tracking without going through team-cleanup.
+     * Used during forced cleanup (e.g. FinishedPhase) where the team state is
+     * being torn down by the caller.
+     */
+    public void forceRemove(UUID playerId) {
+        Match match = matchByPlayer.remove(playerId);
+        if (match == null) return;
         boolean stillHasPlayers = matchByPlayer.values().stream()
                 .anyMatch(m -> m == match);
         if (!stillHasPlayers) {

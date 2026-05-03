@@ -103,6 +103,15 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Spieler nicht online: " + args[1], NamedTextColor.RED));
             return;
         }
+        if (player == captainPlayer) {
+            player.sendMessage(Component.text("Du kannst nicht deinem eigenen Match joinen.", NamedTextColor.RED));
+            return;
+        }
+        Match existing = matchManager.getMatchOf(player.getUniqueId());
+        if (existing != null) {
+            matchManager.leaveMatch(player.getUniqueId());
+            plugin.getWorldManager().teleportToLobby(player);
+        }
         if (args.length >= 3) {
             int teamIndex;
             try {

@@ -299,4 +299,53 @@ class MatchManagerTest {
         assertThrows(IllegalArgumentException.class,
                 () -> manager.joinMatch(joiner, captain, -1));
     }
+
+    @Test
+    void leaveAfterTeamDisbandedDoesNotThrow() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        manager.createMatch(captain, 1);
+        Match match = manager.getMatchOf(captain);
+        // Simulate: team got disbanded externally (e.g. WaveBuildPhase auto-cleanup)
+        // but matchByPlayer still tracks the player
+        match.findTeamOf(captain).disband();
+
+        assertDoesNotThrow(() -> manager.leaveMatch(captain));
+        assertNull(manager.getMatchOf(captain));
+    }
+
+    @Test
+    void forceRemoveDropsPlayerAndClosesEmptyMatch() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        Match match = manager.createMatch(captain, 1);
+
+        manager.forceRemove(captain);
+
+        assertNull(manager.getMatchOf(captain));
+        assertFalse(manager.getActiveMatches().contains(match));
+    }
+
+    @Test
+    void forceRemoveLeavesMatchOpenWhenOtherPlayersExist() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        Match match = manager.createMatch(captain, 1);
+        manager.joinMatch(joiner, captain, 1);
+
+        manager.forceRemove(captain);
+
+        assertNull(manager.getMatchOf(captain));
+        assertSame(match, manager.getMatchOf(joiner));
+        assertTrue(manager.getActiveMatches().contains(match));
+    }
+
+    @Test
+    void forceRemoveOnNonMemberDoesNothing() {
+        MatchManager manager = new MatchManager();
+        UUID stranger = UUID.randomUUID();
+
+        assertDoesNotThrow(() -> manager.forceRemove(stranger));
+    }
 }
