@@ -101,4 +101,37 @@ class MatchTest {
 
         assertEquals("foo-id", match.getId());
     }
+
+    @Test
+    void matchHasSeed() {
+        Match match = new Match("test-match-1", 12345L);
+        assertEquals(12345L, match.getSeed());
+    }
+
+    @Test
+    void canAssociateFarmWorld() {
+        Match match = new Match("test-match-1", 0L);
+        UUID captain = UUID.randomUUID();
+        Team team = new Team(captain);
+        match.addTeam(team);
+
+        match.setFarmWorldName(team, "mab_farm_test-match-1_team-1");
+
+        assertEquals("mab_farm_test-match-1_team-1", match.getFarmWorldName(team));
+    }
+
+    @Test
+    void getFarmWorldNameReturnsNullIfNotSet() {
+        Match match = new Match("test-match-1", 0L);
+        Team team = new Team(UUID.randomUUID());
+        match.addTeam(team);
+
+        assertNull(match.getFarmWorldName(team));
+    }
+
+    @Test
+    void backwardsCompatibleConstructorWorks() {
+        Match match = new Match("test-match-1");
+        assertNotNull(match.getId());
+    }
 }
