@@ -99,14 +99,7 @@ public class WaveBuildGui implements Listener {
     }
 
     private void renderPool(Inventory inv, GuiSession session) {
-        MobPool pool = session.team.getPool();
-        Wave currentWave = currentWave(session);
-        Map<MobEntry, Integer> remaining = new HashMap<>(pool.getEntries());
-        if (!currentWave.isFinalised()) {
-            for (WaveSlot slot : currentWave.getSlots()) {
-                remaining.merge(slot.getEntry(), -slot.getCount(), Integer::sum);
-            }
-        }
+        Map<MobEntry, Integer> remaining = computeRemaining(session);
         int slotIdx = 0;
         for (Map.Entry<MobEntry, Integer> e : remaining.entrySet()) {
             if (slotIdx >= 18) break;
@@ -114,6 +107,18 @@ public class WaveBuildGui implements Listener {
             if (count <= 0) continue;
             inv.setItem(slotIdx++, mobIcon(e.getKey(), count, "verfügbar"));
         }
+    }
+
+    private Map<MobEntry, Integer> computeRemaining(GuiSession session) {
+        MobPool pool = session.team.getPool();
+        Map<MobEntry, Integer> remaining = new HashMap<>(pool.getEntries());
+        for (WaveSlot ws : session.team.getWave1().getSlots()) {
+            remaining.merge(ws.getEntry(), -ws.getCount(), Integer::sum);
+        }
+        for (WaveSlot ws : session.team.getWave2().getSlots()) {
+            remaining.merge(ws.getEntry(), -ws.getCount(), Integer::sum);
+        }
+        return remaining;
     }
 
     private void renderCurrentWave(Inventory inv, GuiSession session) {
@@ -269,14 +274,7 @@ public class WaveBuildGui implements Listener {
     }
 
     private MobEntry poolEntryAtSlot(GuiSession session, int slot) {
-        MobPool pool = session.team.getPool();
-        Wave currentWave = currentWave(session);
-        Map<MobEntry, Integer> remaining = new HashMap<>(pool.getEntries());
-        if (!currentWave.isFinalised()) {
-            for (WaveSlot ws : currentWave.getSlots()) {
-                remaining.merge(ws.getEntry(), -ws.getCount(), Integer::sum);
-            }
-        }
+        Map<MobEntry, Integer> remaining = computeRemaining(session);
         int idx = 0;
         for (Map.Entry<MobEntry, Integer> e : remaining.entrySet()) {
             if (e.getValue() <= 0) continue;
@@ -296,8 +294,9 @@ public class WaveBuildGui implements Listener {
 
     private int remainingForEntry(GuiSession session, MobEntry entry) {
         int poolCount = session.team.getPool().countOf(entry);
-        int waveCount = currentWave(session).countOf(entry);
-        return poolCount - waveCount;
+        int wave1Count = session.team.getWave1().countOf(entry);
+        int wave2Count = session.team.getWave2().countOf(entry);
+        return poolCount - wave1Count - wave2Count;
     }
 
     private void resetWave(GuiSession session) {
