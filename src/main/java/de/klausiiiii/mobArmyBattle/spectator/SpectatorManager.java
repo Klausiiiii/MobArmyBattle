@@ -63,7 +63,10 @@ public class SpectatorManager {
         }
 
         Match viewerMatch = matchManager.getMatchOf(viewerId);
-        if (viewerMatch != null && viewerMatch.getId().equals(targetMatch.getId())) {
+        if (viewerMatch != null) {
+            if (!viewerMatch.getId().equals(targetMatch.getId())) {
+                return new PermissionResult.Denied("Du bist in einem anderen Match.");
+            }
             BattleSession session = battleManager.getSessionByPlayer(viewerId);
             if (session == null) return new PermissionResult.Denied("Du bist nicht in einer Battle-Session.");
             BattleSession.TeamState own = session.getStateByPlayerUUID(viewerId);
@@ -77,7 +80,8 @@ public class SpectatorManager {
         }
 
         Tournament tournament = tournamentManager.findEliminatedTournamentOf(viewerId);
-        if (tournament != null) {
+        if (tournament != null
+                && tournament == tournamentManager.getTournamentByMatchId(targetMatch.getId())) {
             return new PermissionResult.Allowed(targetMatch.getId(), arenaWorld);
         }
 

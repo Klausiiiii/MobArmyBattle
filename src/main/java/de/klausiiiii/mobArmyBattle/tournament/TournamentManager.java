@@ -76,6 +76,10 @@ public class TournamentManager {
         return null;
     }
 
+    public Tournament getTournamentByMatchId(String matchId) {
+        return byMatchId.get(matchId);
+    }
+
     public void join(String name, UUID captainId) {
         Tournament t = getByName(name);
         if (t == null) {
