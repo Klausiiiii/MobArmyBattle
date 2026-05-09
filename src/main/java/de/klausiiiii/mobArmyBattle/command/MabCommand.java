@@ -26,7 +26,10 @@ import java.util.UUID;
 
 public class MabCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = List.of("create", "join", "leave", "start", "pool", "endfarm");
+    private static final List<String> SUBCOMMANDS =
+            List.of("create", "join", "leave", "start", "pool", "endfarm", "tournament", "stats", "leaderboard");
+    private static final List<String> TOURNAMENT_SUBS =
+            List.of("create", "join", "leave", "start", "list");
 
     private final MatchManager matchManager;
     private final MobArmyBattle plugin;
@@ -58,6 +61,9 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 case "start" -> handleStart(player);
                 case "pool" -> handlePool(player);
                 case "endfarm" -> handleEndFarm(player);
+                case "tournament", "tour", "t" -> handleTournament(player, args);
+                case "stats" -> handleStats(player, args);
+                case "leaderboard", "top" -> handleLeaderboard(player);
                 default -> sendUsage(player);
             }
         } catch (IllegalStateException | IllegalArgumentException e) {
@@ -235,6 +241,150 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         });
     }
 
+    private void handleTournament(Player player, String[] args) {
+        if (args.length < 2) {
+            sendTournamentUsage(player);
+            return;
+        }
+        String sub = args[1].toLowerCase();
+        switch (sub) {
+            case "create" -> handleTournamentCreate(player, args);
+            case "join" -> handleTournamentJoin(player, args);
+            case "leave" -> handleTournamentLeave(player);
+            case "start" -> handleTournamentStart(player, args);
+            case "list" -> handleTournamentList(player);
+            default -> sendTournamentUsage(player);
+        }
+    }
+
+    private void handleTournamentCreate(Player player, String[] args) {
+        if (args.length < 3) {
+            player.sendMessage(Component.text("Verwendung: /mab tournament create <name>", NamedTextColor.RED));
+            return;
+        }
+        String name = args[2];
+        plugin.getTournamentManager().create(name, player.getUniqueId());
+        player.sendMessage(Component.text(
+                "Tournament '" + name + "' erstellt — du bist Master.",
+                NamedTextColor.GREEN));
+        player.sendMessage(Component.text(
+                "Captains joinen mit: /mab tournament join " + name,
+                NamedTextColor.GRAY));
+    }
+
+    private void handleTournamentJoin(Player player, String[] args) {
+        if (args.length < 3) {
+            player.sendMessage(Component.text("Verwendung: /mab tournament join <name>", NamedTextColor.RED));
+            return;
+        }
+        String name = args[2];
+        plugin.getTournamentManager().join(name, player.getUniqueId());
+        player.sendMessage(Component.text(
+                "Tournament '" + name + "' beigetreten — warte auf Master-Start.",
+                NamedTextColor.GREEN));
+    }
+
+    private void handleTournamentLeave(Player player) {
+        var t = plugin.getTournamentManager().getByCaptain(player.getUniqueId());
+        if (t == null) {
+            player.sendMessage(Component.text("Du bist in keinem Tournament.", NamedTextColor.RED));
+            return;
+        }
+        plugin.getTournamentManager().leave(player.getUniqueId());
+        player.sendMessage(Component.text(
+                "Tournament '" + t.getName() + "' verlassen.",
+                NamedTextColor.YELLOW));
+    }
+
+    private void handleTournamentStart(Player player, String[] args) {
+        if (args.length < 3) {
+            player.sendMessage(Component.text("Verwendung: /mab tournament start <name>", NamedTextColor.RED));
+            return;
+        }
+        plugin.getTournamentManager().start(args[2], player.getUniqueId());
+    }
+
+    private void handleTournamentList(Player player) {
+        var tournaments = plugin.getTournamentManager().listAll();
+        if (tournaments.isEmpty()) {
+            player.sendMessage(Component.text("Keine aktiven Tournaments.", NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Component.text("Aktive Tournaments:", NamedTextColor.GOLD));
+        for (var t : tournaments) {
+            player.sendMessage(Component.text(
+                    "  " + t.getName() + " — " + t.getStatus()
+                            + " (" + t.getRegisteredCaptains().size() + " Captains)",
+                    NamedTextColor.GRAY));
+        }
+    }
+
+    private void handleStats(Player player, String[] args) {
+        UUID targetId;
+        String displayName;
+        if (args.length >= 2) {
+            Player target = Bukkit.getPlayerExact(args[1]);
+            if (target == null) {
+                player.sendMessage(Component.text("Spieler nicht online: " + args[1], NamedTextColor.RED));
+                return;
+            }
+            targetId = target.getUniqueId();
+            displayName = target.getName();
+        } else {
+            targetId = player.getUniqueId();
+            displayName = player.getName();
+        }
+        var stats = plugin.getStatsRepository().get(targetId);
+        player.sendMessage(Component.text("Stats für " + displayName + ":", NamedTextColor.GOLD));
+        player.sendMessage(Component.text(
+                "  Matches: " + stats.getMatchesTotal()
+                        + " (W: " + stats.getMatchesWon()
+                        + " / L: " + stats.getMatchesLost() + ")",
+                NamedTextColor.GRAY));
+        player.sendMessage(Component.text(
+                String.format("  Win-Rate: %.1f%%", stats.getWinRate() * 100),
+                NamedTextColor.GRAY));
+        player.sendMessage(Component.text(
+                "  Mob-Kills: " + stats.getMobKillsTotal(),
+                NamedTextColor.GRAY));
+    }
+
+    private void handleLeaderboard(Player player) {
+        var top = plugin.getStatsRepository().getLeaderboard(10);
+        if (top.isEmpty()) {
+            player.sendMessage(Component.text("Leaderboard ist leer.", NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Component.text("Top 10:", NamedTextColor.GOLD));
+        int rank = 1;
+        for (var s : top) {
+            String name = nameOf(s.getPlayerId());
+            player.sendMessage(Component.text(
+                    "  " + rank + ". " + name + " — "
+                            + s.getMatchesWon() + "W / " + s.getMatchesLost() + "L"
+                            + " · " + s.getMobKillsTotal() + " Kills",
+                    NamedTextColor.GRAY));
+            rank++;
+        }
+    }
+
+    private String nameOf(UUID id) {
+        Player p = Bukkit.getPlayer(id);
+        if (p != null) return p.getName();
+        var offline = Bukkit.getOfflinePlayer(id);
+        String name = offline.getName();
+        return name != null ? name : id.toString().substring(0, 8);
+    }
+
+    private void sendTournamentUsage(Player player) {
+        player.sendMessage(Component.text("Tournament-Befehle:", NamedTextColor.GOLD));
+        player.sendMessage(Component.text("/mab tournament create <name>", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab tournament join <name>", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab tournament leave", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab tournament start <name> — nur Master", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab tournament list", NamedTextColor.GRAY));
+    }
+
     private String summarize(String eq) {
         for (String slot : eq.split("\\|")) {
             if (!slot.equals("none")) {
@@ -252,6 +402,9 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/mab start — Match starten (nur Captain)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab pool — Team-Pool anzeigen", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab endfarm — Farm-Phase beenden (nur Captain)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab tournament <create|join|leave|start|list>", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab stats [player] — Lifetime-Stats", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab leaderboard — Top 10", NamedTextColor.GRAY));
     }
 
     @Override
@@ -281,6 +434,18 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("join")) {
             return filterByPrefix(List.of("1", "2", "3", "4", "5", "6", "7", "8"), args[2]);
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("tournament")) {
+            return filterByPrefix(TOURNAMENT_SUBS, args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("tournament")) {
+            String sub = args[1].toLowerCase(Locale.ROOT);
+            if (sub.equals("join") || sub.equals("start")) {
+                List<String> names = new ArrayList<>();
+                plugin.getTournamentManager().listAll().forEach(t -> names.add(t.getName()));
+                return filterByPrefix(names, args[2]);
+            }
         }
 
         return Collections.emptyList();

@@ -5,12 +5,16 @@ import de.klausiiiii.mobArmyBattle.bossbar.MatchBossBarManager;
 import de.klausiiiii.mobArmyBattle.command.MabCommand;
 import de.klausiiiii.mobArmyBattle.command.MabMenuGui;
 import de.klausiiiii.mobArmyBattle.listener.BattleEventListener;
-import de.klausiiiii.mobArmyBattle.listener.FarmRespawnListener;
 import de.klausiiiii.mobArmyBattle.listener.MobKillListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerConnectionListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerDeathFarmListener;
+import de.klausiiiii.mobArmyBattle.listener.PlayerRespawnListener;
 import de.klausiiiii.mobArmyBattle.listener.WorldGroupInventoryListener;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
+import de.klausiiiii.mobArmyBattle.stats.StatsDatabase;
+import de.klausiiiii.mobArmyBattle.stats.StatsRecorder;
+import de.klausiiiii.mobArmyBattle.stats.StatsRepository;
+import de.klausiiiii.mobArmyBattle.tournament.TournamentManager;
 import de.klausiiiii.mobArmyBattle.wave.WaveBuildGui;
 import de.klausiiiii.mobArmyBattle.world.LobbyInventoryManager;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
@@ -26,6 +30,9 @@ public final class MobArmyBattle extends JavaPlugin {
     private LobbyInventoryManager lobbyInventoryManager;
     private MatchBossBarManager bossBarManager;
     private BattleManager battleManager;
+    private TournamentManager tournamentManager;
+    private StatsDatabase statsDatabase;
+    private StatsRepository statsRepository;
 
     @Override
     public void onEnable() {
@@ -46,15 +53,16 @@ public final class MobArmyBattle extends JavaPlugin {
         mabCmd.setTabCompleter(mabHandler);
 
         lobbyInventoryManager = new LobbyInventoryManager();
+        tournamentManager = new TournamentManager(this, matchManager);
 
         getServer().getPluginManager().registerEvents(
-                new PlayerConnectionListener(matchManager, worldManager), this);
+                new PlayerConnectionListener(matchManager, worldManager, tournamentManager), this);
         getServer().getPluginManager().registerEvents(
                 new MobKillListener(matchManager), this);
         getServer().getPluginManager().registerEvents(
                 new PlayerDeathFarmListener(matchManager), this);
         getServer().getPluginManager().registerEvents(
-                new FarmRespawnListener(matchManager), this);
+                new PlayerRespawnListener(this, matchManager), this);
         getServer().getPluginManager().registerEvents(
                 new WorldGroupInventoryListener(lobbyInventoryManager), this);
 
@@ -69,6 +77,18 @@ public final class MobArmyBattle extends JavaPlugin {
         battleManager = new BattleManager(this);
         getServer().getPluginManager().registerEvents(
                 new BattleEventListener(battleManager), this);
+        battleManager.addBattleEndListener(tournamentManager::onBattleFinished);
+
+        statsDatabase = new StatsDatabase(this);
+        try {
+            statsDatabase.open();
+            statsRepository = new StatsRepository(statsDatabase, getLogger());
+            StatsRecorder statsRecorder = new StatsRecorder(statsRepository);
+            battleManager.addMatchCompletedListener(statsRecorder::onMatchCompleted);
+        } catch (RuntimeException e) {
+            getLogger().warning("Stats-DB nicht verfügbar — Stats werden nicht persistiert: " + e.getMessage());
+            statsRepository = new StatsRepository(statsDatabase, getLogger());
+        }
 
         getServer().getScheduler().runTaskTimer(this, () -> {
             matchManager.tickAll();
@@ -82,6 +102,9 @@ public final class MobArmyBattle extends JavaPlugin {
     public void onDisable() {
         if (bossBarManager != null) {
             bossBarManager.clear();
+        }
+        if (statsDatabase != null) {
+            statsDatabase.close();
         }
         getLogger().info("MobArmyBattle deaktiviert.");
     }
@@ -108,5 +131,13 @@ public final class MobArmyBattle extends JavaPlugin {
 
     public BattleManager getBattleManager() {
         return battleManager;
+    }
+
+    public TournamentManager getTournamentManager() {
+        return tournamentManager;
+    }
+
+    public StatsRepository getStatsRepository() {
+        return statsRepository;
     }
 }

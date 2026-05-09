@@ -44,7 +44,7 @@ public class WorldManager {
         World existing = Bukkit.getWorld(LOBBY_WORLD_NAME);
         if (existing != null) {
             lobbyWorld = existing;
-            applyLobbySettings(existing);
+            applyAlwaysDay(existing);
             return existing;
         }
 
@@ -56,13 +56,13 @@ public class WorldManager {
             throw new IllegalStateException("Konnte Lobby-Welt nicht erstellen");
         }
         lobbyWorld.setSpawnLocation(0, LOBBY_SPAWN_Y, 0);
-        applyLobbySettings(lobbyWorld);
+        applyAlwaysDay(lobbyWorld);
         buildLobbyPlatform(lobbyWorld);
         log.info("Lobby-Welt initialisiert: " + LOBBY_WORLD_NAME);
         return lobbyWorld;
     }
 
-    private void applyLobbySettings(World world) {
+    private void applyAlwaysDay(World world) {
         world.setTime(6000);
         world.setGameRule(GameRules.ADVANCE_TIME, false);
     }
@@ -106,6 +106,7 @@ public class WorldManager {
         if (world == null) {
             throw new IllegalStateException("Konnte Arena-Welt nicht erstellen: " + name);
         }
+        applyAlwaysDay(world);
         log.info("Arena-Welt erstellt: " + name);
         return world;
     }

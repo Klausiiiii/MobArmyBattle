@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 public class BattleManager {
 
@@ -26,6 +27,8 @@ public class BattleManager {
     private final WaveSpawner waveSpawner = new WaveSpawner();
     private final Map<String, List<BattleSession>> matchSessions = new HashMap<>();
     private final Map<UUID, BattleSession> sessionByMobUUID = new HashMap<>();
+    private final List<BiConsumer<Match, UUID>> battleEndListeners = new ArrayList<>();
+    private final List<BiConsumer<Match, List<TeamOutcome>>> matchCompletedListeners = new ArrayList<>();
 
     public BattleManager(MobArmyBattle plugin) {
         this.plugin = plugin;
@@ -173,10 +176,50 @@ public class BattleManager {
         BattleResult.Winner winner = BattleResult.compare(a.stats, b.stats);
         announceResult(session, winner);
         Match match = session.getMatch();
+        Team winningTeam = (winner == BattleResult.Winner.B) ? b.team : a.team;
+        UUID winnerCaptain = winningTeam.getCaptainId();
+        if (winnerCaptain != null) {
+            for (BiConsumer<Match, UUID> listener : battleEndListeners) {
+                listener.accept(match, winnerCaptain);
+            }
+        }
         List<BattleSession> all = matchSessions.get(match.getId());
         if (all != null && all.stream().allMatch(BattleSession::isConcluded)) {
+            notifyMatchCompleted(match, all);
             match.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.FinishedPhase(plugin));
         }
+    }
+
+    private void notifyMatchCompleted(Match match, List<BattleSession> sessions) {
+        if (matchCompletedListeners.isEmpty()) return;
+        List<TeamOutcome> outcomes = new ArrayList<>();
+        for (BattleSession session : sessions) {
+            BattleSession.TeamState a = session.getStateA();
+            BattleSession.TeamState b = session.getStateB();
+            BattleResult.Winner winner = BattleResult.compare(a.stats, b.stats);
+            boolean aWon = winner != BattleResult.Winner.B;
+            outcomes.add(new TeamOutcome(
+                    a.team.getCaptainId(),
+                    java.util.Set.copyOf(a.team.getMemberIds()),
+                    aWon,
+                    a.stats.getMobKills()));
+            outcomes.add(new TeamOutcome(
+                    b.team.getCaptainId(),
+                    java.util.Set.copyOf(b.team.getMemberIds()),
+                    !aWon,
+                    b.stats.getMobKills()));
+        }
+        for (BiConsumer<Match, List<TeamOutcome>> listener : matchCompletedListeners) {
+            listener.accept(match, outcomes);
+        }
+    }
+
+    public void addBattleEndListener(BiConsumer<Match, UUID> listener) {
+        battleEndListeners.add(listener);
+    }
+
+    public void addMatchCompletedListener(BiConsumer<Match, List<TeamOutcome>> listener) {
+        matchCompletedListeners.add(listener);
     }
 
     private void announceResult(BattleSession session, BattleResult.Winner winner) {

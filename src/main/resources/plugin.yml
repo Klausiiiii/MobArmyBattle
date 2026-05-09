@@ -6,6 +6,9 @@ main: de.klausiiiii.mobArmyBattle.MobArmyBattle
 api-version: '26.1.2'
 load: POSTWORLD
 
+libraries:
+  - org.xerial:sqlite-jdbc:3.46.1.3
+
 authors: [ Klausiiiii ]
 
 commands:
