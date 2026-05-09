@@ -1,5 +1,6 @@
 package de.klausiiiii.mobArmyBattle.world;
 
+import de.klausiiiii.mobArmyBattle.config.WorldBorderConfig;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -13,7 +14,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
 import org.bukkit.block.sign.Side;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
+import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 
 import java.io.File;
 import java.util.Random;
@@ -28,11 +29,11 @@ public class WorldManager {
     private static final int LOBBY_SPAWN_Y = 64;
     private static final int LOBBY_PLATFORM_RADIUS = 2; // 5x5 platform
 
-    private final JavaPlugin plugin;
+    private final MobArmyBattle plugin;
     private final Logger log;
     private World lobbyWorld;
 
-    public WorldManager(JavaPlugin plugin) {
+    public WorldManager(MobArmyBattle plugin) {
         this.plugin = plugin;
         this.log = plugin.getLogger();
     }
@@ -93,6 +94,16 @@ public class WorldManager {
         if (world == null) {
             throw new IllegalStateException("Konnte Farm-Welt nicht erstellen: " + name);
         }
+        // Plan 9: WorldBorder + Mob-Spawn-Multiplier
+        WorldBorderConfig borderCfg = plugin.getMabConfig().farmBorder();
+        if (borderCfg.enabled() && borderCfg.radius() > 0) {
+            world.getWorldBorder().setCenter(world.getSpawnLocation());
+            world.getWorldBorder().setSize(borderCfg.radius() * 2.0);
+        }
+        double mult = plugin.getMabConfig().farmMobSpawnMultiplier();
+        int currentLimit = world.getMonsterSpawnLimit();
+        int baseline = currentLimit > 0 ? currentLimit : 70;
+        world.setMonsterSpawnLimit((int) Math.max(1, baseline * mult));
         log.info("Farm-Welt erstellt: " + name + " (seed=" + seed + ")");
         return world;
     }
@@ -107,6 +118,12 @@ public class WorldManager {
             throw new IllegalStateException("Konnte Arena-Welt nicht erstellen: " + name);
         }
         applyAlwaysDay(world);
+        // Plan 9: WorldBorder
+        WorldBorderConfig arenaBorderCfg = plugin.getMabConfig().arenaBorder();
+        if (arenaBorderCfg.enabled() && arenaBorderCfg.radius() > 0) {
+            world.getWorldBorder().setCenter(world.getSpawnLocation());
+            world.getWorldBorder().setSize(arenaBorderCfg.radius() * 2.0);
+        }
         log.info("Arena-Welt erstellt: " + name);
         return world;
     }
