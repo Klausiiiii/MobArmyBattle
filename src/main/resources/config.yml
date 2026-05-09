@@ -1,6 +1,7 @@
 phases:
   farm-duration-min: 60
   wave-build-duration-min: 5
+  # Reserved for Plan 10 (currently no effect):
   prep-duration-sec: 30
   wave-pause-sec: 10
   wave-hard-timeout-min: 10

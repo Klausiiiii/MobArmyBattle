@@ -23,7 +23,7 @@ public final class ConfigLoader {
         DeathPenaltyConfig dp = loadDeathPenalty(cfg, log);
         WorldBorderConfig farmBorder = loadBorder(cfg, "farm-world.border", log, MabConfig.defaults().farmBorder());
         WorldBorderConfig arenaBorder = loadBorder(cfg, "arena.border", log, MabConfig.defaults().arenaBorder());
-        double mobMult = cfg.getDouble("farm-world.mob-spawn-multiplier", 2.0);
+        double mobMult = loadMobMultiplier(cfg, log);
         ReconnectConfig reconnect = loadReconnect(cfg, log);
 
         try {
@@ -105,6 +105,15 @@ public final class ConfigLoader {
             log.warning(path + " invalid: " + e.getMessage());
             return defaults;
         }
+    }
+
+    private static double loadMobMultiplier(FileConfiguration cfg, Logger log) {
+        double mult = cfg.getDouble("farm-world.mob-spawn-multiplier", 2.0);
+        if (mult <= 0) {
+            log.warning("farm-world.mob-spawn-multiplier muss > 0 sein, war " + mult + " — verwende 2.0");
+            return 2.0;
+        }
+        return mult;
     }
 
     private static ReconnectConfig loadReconnect(FileConfiguration cfg, Logger log) {
