@@ -108,6 +108,14 @@ public class Tournament {
         rounds.add(buildRound(rounds.size() + 1, survivors, rng));
     }
 
+    public boolean isEliminated(UUID captainId) {
+        if (status != Status.RUNNING) return false;
+        if (!registered.contains(captainId)) return false;
+        TournamentRound round = getCurrentRound();
+        if (round == null) return false;
+        return !round.activeCaptains().contains(captainId);
+    }
+
     private static TournamentRound buildRound(int number, List<UUID> participants, Random rng) {
         List<UUID> shuffled = new ArrayList<>(participants);
         Collections.shuffle(shuffled, rng);

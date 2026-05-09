@@ -168,4 +168,42 @@ class TournamentTest {
         for (int i = 0; i < n; i++) t.register(UUID.randomUUID());
         return t;
     }
+
+    @Test
+    void isEliminatedFalseForRegisteringTournament() {
+        Tournament t = new Tournament("t1", "T1", UUID.randomUUID());
+        UUID c = UUID.randomUUID();
+        t.register(c);
+        assertFalse(t.isEliminated(c));
+    }
+
+    @Test
+    void isEliminatedFalseForUnregisteredCaptain() {
+        Tournament t = freshRunning(2);
+        assertFalse(t.isEliminated(UUID.randomUUID()));
+    }
+
+    @Test
+    void isEliminatedTrueAfterLosingPairing() {
+        Tournament t = new Tournament("t1", "T1", UUID.randomUUID());
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        t.register(a);
+        t.register(b);
+        t.start(new java.util.Random(0));
+        TournamentPairing p = t.getCurrentRound().getPairings().get(0);
+        p.setMatchId("m1");
+        UUID winner = p.getCaptainA();
+        UUID loser = p.getCaptainB();
+        t.recordPairingWinner("m1", winner);
+
+        assertFalse(t.isEliminated(winner));
+        assertTrue(t.isEliminated(loser));
+    }
+
+    private static Tournament freshRunning(int n) {
+        Tournament t = new Tournament("t" + n, "T" + n, UUID.randomUUID());
+        for (int i = 0; i < n; i++) t.register(UUID.randomUUID());
+        t.start(new java.util.Random(0));
+        return t;
+    }
 }
