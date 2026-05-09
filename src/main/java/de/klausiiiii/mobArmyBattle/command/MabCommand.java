@@ -28,7 +28,7 @@ import java.util.UUID;
 public class MabCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("create", "join", "leave", "start", "pool", "endfarm", "tournament", "stats", "leaderboard", "spectate");
+            List.of("create", "join", "leave", "start", "pool", "endfarm", "tournament", "stats", "leaderboard", "spectate", "reload");
     private static final List<String> TOURNAMENT_SUBS =
             List.of("create", "join", "leave", "start", "list");
 
@@ -72,6 +72,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 case "stats" -> handleStats(player, args);
                 case "leaderboard", "top" -> handleLeaderboard(player);
                 case "spectate" -> handleSpectate(player, args);
+                case "reload" -> handleReload(player);
                 default -> sendUsage(player);
             }
         } catch (IllegalStateException | IllegalArgumentException e) {
@@ -461,6 +462,15 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         spectatorManager.startSpectate(player, target.getUniqueId());
     }
 
+    private void handleReload(Player player) {
+        if (!player.hasPermission("mobarmybattle.reload")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
+        plugin.reloadMabConfig();
+        player.sendMessage(Component.text("MabConfig neu geladen.", NamedTextColor.GREEN));
+    }
+
     private String nameOf(UUID id) {
         Player p = Bukkit.getPlayer(id);
         if (p != null) return p.getName();
@@ -499,6 +509,9 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/mab stats [player] — Lifetime-Stats", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leaderboard — Top 10", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab spectate [captain] — Battle zuschauen", NamedTextColor.GRAY));
+        if (player.hasPermission("mobarmybattle.reload")) {
+            player.sendMessage(Component.text("/mab reload — Konfiguration neu laden", NamedTextColor.GRAY));
+        }
     }
 
     @Override
@@ -509,7 +522,11 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 1) {
-            return filterByPrefix(SUBCOMMANDS, args[0]);
+            List<String> visible = new ArrayList<>(SUBCOMMANDS);
+            if (!sender.hasPermission("mobarmybattle.reload")) {
+                visible.remove("reload");
+            }
+            return filterByPrefix(visible, args[0]);
         }
 
         if (args.length == 2 && args[0].equalsIgnoreCase("join")) {
