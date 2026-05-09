@@ -1,6 +1,8 @@
 package de.klausiiiii.mobArmyBattle;
 
 import de.klausiiiii.mobArmyBattle.battle.BattleManager;
+import de.klausiiiii.mobArmyBattle.config.ConfigLoader;
+import de.klausiiiii.mobArmyBattle.config.MabConfig;
 import de.klausiiiii.mobArmyBattle.bossbar.MatchBossBarManager;
 import de.klausiiiii.mobArmyBattle.command.MabCommand;
 import de.klausiiiii.mobArmyBattle.command.MabMenuGui;
@@ -25,6 +27,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class MobArmyBattle extends JavaPlugin {
 
+    private MabConfig mabConfig;
     private MatchManager matchManager;
     private WorldManager worldManager;
     private WaveBuildGui waveBuildGui;
@@ -40,6 +43,10 @@ public final class MobArmyBattle extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // 0. Config
+        saveDefaultConfig();
+        mabConfig = ConfigLoader.load(this);
+
         // 1. WorldManager
         worldManager = new WorldManager(this);
         worldManager.cleanupOrphanWorlds();
@@ -176,5 +183,14 @@ public final class MobArmyBattle extends JavaPlugin {
 
     public SidebarManager getSidebarManager() {
         return sidebarManager;
+    }
+
+    public MabConfig getMabConfig() {
+        return mabConfig;
+    }
+
+    public void reloadMabConfig() {
+        reloadConfig();
+        mabConfig = ConfigLoader.load(this);
     }
 }
