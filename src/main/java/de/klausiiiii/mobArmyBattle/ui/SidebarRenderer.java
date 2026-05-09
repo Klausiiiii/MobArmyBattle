@@ -34,21 +34,33 @@ public final class SidebarRenderer {
         return switch (phase) {
             case FARM -> renderFarm(match, viewer, currentTimeMs);
             case WAVE_BUILD -> renderWaveBuild(match, viewer, currentTimeMs);
-            case BATTLE -> List.of();       // Task 3
+            case BATTLE -> renderBattle(match, viewer, battleCtx, currentTimeMs);
             default -> List.of();           // LOBBY/FINISHED → empty
         };
     }
 
+    // ── shared header/footer helpers ─────────────────────────────────────────
+
+    private static void addHeader(List<String> lines, Match match, String phaseLabel, long currentTimeMs) {
+        lines.add("§e§lMobArmyBattle");
+        lines.add(phaseLabel);
+        lines.add("§7Zeit: §f" + formatElapsed(match.getPhaseStartedAt(), currentTimeMs));
+    }
+
+    private static void addFooter(List<String> lines, Match match) {
+        lines.add("§7Teams aktiv: " + activeTeamCount(match) + "/" + match.getTeams().size());
+    }
+
+    // ── phase renderers ───────────────────────────────────────────────────────
+
     private static List<String> renderWaveBuild(Match match, Team viewer, long currentTimeMs) {
         List<String> lines = new ArrayList<>();
-        lines.add("§e§lMobArmyBattle");
-        lines.add("§7Phase: §eWelle bauen");
-        lines.add("§7Zeit: §f" + formatElapsed(match.getPhaseStartedAt(), currentTimeMs));
+        addHeader(lines, match, "§7Phase: §eWelle bauen", currentTimeMs);
         lines.add(SEP);
         lines.add(waveLine(1, viewer.getWave1().totalMobCount()));
         lines.add(waveLine(2, viewer.getWave2().totalMobCount()));
         lines.add(SEP);
-        lines.add("§7Teams aktiv: " + activeTeamCount(match) + "/" + match.getTeams().size());
+        addFooter(lines, match);
         return lines;
     }
 
@@ -59,14 +71,32 @@ public final class SidebarRenderer {
 
     private static List<String> renderFarm(Match match, Team viewer, long currentTimeMs) {
         List<String> lines = new ArrayList<>();
-        lines.add("§e§lMobArmyBattle");
-        lines.add("§7Phase: §aFarm");
-        lines.add("§7Zeit: §f" + formatElapsed(match.getPhaseStartedAt(), currentTimeMs));
+        addHeader(lines, match, "§7Phase: §aFarm", currentTimeMs);
         lines.add(SEP);
         lines.add("§6Pool:");
         appendPoolLines(lines, viewer);
         lines.add(SEP);
-        lines.add("§7Teams aktiv: " + activeTeamCount(match) + "/" + match.getTeams().size());
+        addFooter(lines, match);
+        return lines;
+    }
+
+    private static List<String> renderBattle(Match match, Team viewer, BattleContext ctx, long currentTimeMs) {
+        List<String> lines = new ArrayList<>();
+        addHeader(lines, match, "§7Phase: §cBattle - W" + (ctx == null ? 0 : ctx.currentWaveNumber()), currentTimeMs);
+        lines.add(SEP);
+        if (ctx == null) {
+            lines.add("§7(Daten lädt …)");
+        } else {
+            lines.add("§7Mobs übrig: §f" + ctx.mobsAlive() + "/" + ctx.mobsTotalThisWave());
+            lines.add("§7Kills: §f" + ctx.mobKills());
+            String teamColor = ctx.teamMembersAlive() == 0 ? "§c" : "§f";
+            lines.add("§7Team: " + teamColor + ctx.teamMembersAlive() + "/" + ctx.teamMembersTotal() + " lebt");
+        }
+        lines.add(SEP);
+        if (ctx != null && ctx.pairCaptainName() != null) {
+            lines.add("§7Pair gegen §f" + ctx.pairCaptainName());
+        }
+        addFooter(lines, match);
         return lines;
     }
 

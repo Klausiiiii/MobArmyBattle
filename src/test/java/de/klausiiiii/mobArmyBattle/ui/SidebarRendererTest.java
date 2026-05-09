@@ -110,4 +110,41 @@ class SidebarRendererTest {
         m.transitionTo(new WaveBuildPhase());
         return m;
     }
+
+    @Test
+    void rendersBattleLayoutWithLiveData() {
+        Match match = battleMatch();
+        Team t = match.getTeams().get(0);
+        BattleContext ctx = new BattleContext(8, 20, 12, 3, 4, 1, "FooCaptain");
+
+        List<String> lines = SidebarRenderer.render(match, t, ctx, match.getPhaseStartedAt());
+
+        assertTrue(lines.contains("§7Phase: §cBattle - W1"));
+        assertTrue(lines.contains("§7Mobs übrig: §f8/20"));
+        assertTrue(lines.contains("§7Kills: §f12"));
+        assertTrue(lines.contains("§7Team: §f3/4 lebt"));
+        assertTrue(lines.contains("§7Pair gegen §fFooCaptain"));
+    }
+
+    @Test
+    void rendersBattleAllMembersDownInRed() {
+        Match match = battleMatch();
+        Team t = match.getTeams().get(0);
+        BattleContext ctx = new BattleContext(0, 20, 5, 0, 4, 2, "FooCaptain");
+
+        List<String> lines = SidebarRenderer.render(match, t, ctx, match.getPhaseStartedAt());
+
+        assertTrue(lines.contains("§7Team: §c0/4 lebt"));
+        assertTrue(lines.contains("§7Phase: §cBattle - W2"));
+    }
+
+    private static Match battleMatch() {
+        Match m = new Match("m1");
+        m.addTeam(new Team(UUID.randomUUID(), 4));
+        m.addTeam(new Team(UUID.randomUUID(), 4));
+        m.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.FarmPhase());
+        m.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.WaveBuildPhase());
+        m.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.BattlePhase());
+        return m;
+    }
 }
