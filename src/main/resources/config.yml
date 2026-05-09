@@ -1,0 +1,34 @@
+phases:
+  farm-duration-min: 60
+  wave-build-duration-min: 5
+  prep-duration-sec: 30
+  wave-pause-sec: 10
+  wave-hard-timeout-min: 10
+  auto-farm-transition: true
+
+starter-kit:
+  type: iron_full
+  custom:
+    main: IRON_SWORD
+    off: SHIELD
+    helm: IRON_HELMET
+    chest: IRON_CHESTPLATE
+    legs: IRON_LEGGINGS
+    boots: IRON_BOOTS
+
+death-penalty:
+  mode: soft
+
+farm-world:
+  border:
+    enabled: true
+    radius: 200
+  mob-spawn-multiplier: 2.0
+
+arena:
+  border:
+    enabled: true
+    radius: 50
+
+reconnect:
+  grace-sec: 300
