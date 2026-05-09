@@ -18,15 +18,44 @@ commands:
     aliases: [ mobarmybattle ]
 
 permissions:
+  mobarmybattle.*:
+    description: Alle MobArmyBattle-Permissions
+    default: op
+    children:
+      mobarmybattle.create.match: true
+      mobarmybattle.create.tournament: true
+      mobarmybattle.join: true
+      mobarmybattle.spectate: true
+      mobarmybattle.stats: true
+      mobarmybattle.kick: true
+      mobarmybattle.reload: true
+      mobarmybattle.admin: true
   mobarmybattle.create:
     default: true
-    description: Allow creating matches
+    description: Backwards-compat alias for create.match
+    children:
+      mobarmybattle.create.match: true
+  mobarmybattle.create.match:
+    default: true
+    description: Erlaubt /mab create
+  mobarmybattle.create.tournament:
+    default: op
+    description: Erlaubt /mab tournament create
   mobarmybattle.join:
     default: true
-    description: Allow joining matches
+    description: Erlaubt /mab join, leave
+  mobarmybattle.spectate:
+    default: true
+    description: Erlaubt /mab spectate
+  mobarmybattle.stats:
+    default: true
+    description: Erlaubt /mab stats, leaderboard
+  mobarmybattle.kick:
+    default: op
+    description: Erlaubt /mab kick (Plan 10)
+  mobarmybattle.reload:
+    default: op
+    description: Erlaubt /mab reload
   mobarmybattle.admin:
     default: op
-    description: Admin commands
-  mobarmybattle.spectate:
-    description: Erlaubt /mab spectate
-    default: true
+    description: Admin-Befehle

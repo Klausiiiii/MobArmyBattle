@@ -81,6 +81,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleCreate(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.create.match")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         int maxTeamSize = 1;
         if (args.length >= 2) {
             try {
@@ -108,6 +112,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleJoin(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         if (args.length < 2) {
             player.sendMessage(Component.text("Verwendung: /mab join <captain> [1|2]", NamedTextColor.RED));
             return;
@@ -152,6 +160,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleLeave(Player player) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         if (spectatorManager != null && spectatorManager.isSpectating(player.getUniqueId())) {
             spectatorManager.endSpectate(player.getUniqueId());
             player.sendMessage("§7Spectator-Mode beendet.");
@@ -168,6 +180,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleStart(Player player) {
+        if (!player.hasPermission("mobarmybattle.create.match")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         UUID playerId = player.getUniqueId();
         Match match = matchManager.getMatchOf(playerId);
         if (match == null) {
@@ -203,6 +219,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleEndFarm(Player player) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         Match match = matchManager.getMatchOf(player.getUniqueId());
         if (match == null) {
             player.sendMessage(Component.text("Du bist in keinem Match.", NamedTextColor.RED));
@@ -231,6 +251,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handlePool(Player player) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         Match match = matchManager.getMatchOf(player.getUniqueId());
         if (match == null) {
             player.sendMessage(Component.text("Du bist in keinem Match.", NamedTextColor.RED));
@@ -271,6 +295,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTournamentCreate(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.create.tournament")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         if (args.length < 3) {
             player.sendMessage(Component.text("Verwendung: /mab tournament create <name>", NamedTextColor.RED));
             return;
@@ -286,6 +314,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTournamentJoin(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         if (args.length < 3) {
             player.sendMessage(Component.text("Verwendung: /mab tournament join <name>", NamedTextColor.RED));
             return;
@@ -298,6 +330,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTournamentLeave(Player player) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         var t = plugin.getTournamentManager().getByCaptain(player.getUniqueId());
         if (t == null) {
             player.sendMessage(Component.text("Du bist in keinem Tournament.", NamedTextColor.RED));
@@ -310,6 +346,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTournamentStart(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         if (args.length < 3) {
             player.sendMessage(Component.text("Verwendung: /mab tournament start <name>", NamedTextColor.RED));
             return;
@@ -318,6 +358,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleTournamentList(Player player) {
+        if (!player.hasPermission("mobarmybattle.join")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         var tournaments = plugin.getTournamentManager().listAll();
         if (tournaments.isEmpty()) {
             player.sendMessage(Component.text("Keine aktiven Tournaments.", NamedTextColor.GRAY));
@@ -333,6 +377,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleStats(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.stats")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         UUID targetId;
         String displayName;
         if (args.length >= 2) {
@@ -363,6 +411,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleLeaderboard(Player player) {
+        if (!player.hasPermission("mobarmybattle.stats")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         var top = plugin.getStatsRepository().getLeaderboard(10);
         if (top.isEmpty()) {
             player.sendMessage(Component.text("Leaderboard ist leer.", NamedTextColor.GRAY));
@@ -382,6 +434,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleSpectate(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.spectate")) {
+            player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
+            return;
+        }
         if (spectatorManager == null) {
             player.sendMessage("§cSpectator-Funktion nicht verfügbar.");
             return;
