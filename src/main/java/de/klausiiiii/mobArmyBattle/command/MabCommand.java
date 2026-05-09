@@ -7,6 +7,7 @@ import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
 import de.klausiiiii.mobArmyBattle.match.phase.FarmPhase;
 import de.klausiiiii.mobArmyBattle.match.phase.WaveBuildPhase;
+import de.klausiiiii.mobArmyBattle.spectator.SpectatorManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -27,16 +28,22 @@ import java.util.UUID;
 public class MabCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("create", "join", "leave", "start", "pool", "endfarm", "tournament", "stats", "leaderboard");
+            List.of("create", "join", "leave", "start", "pool", "endfarm", "tournament", "stats", "leaderboard", "spectate");
     private static final List<String> TOURNAMENT_SUBS =
             List.of("create", "join", "leave", "start", "list");
 
     private final MatchManager matchManager;
     private final MobArmyBattle plugin;
+    private final SpectatorManager spectatorManager;
 
     public MabCommand(MobArmyBattle plugin, MatchManager matchManager) {
+        this(plugin, matchManager, null);
+    }
+
+    public MabCommand(MobArmyBattle plugin, MatchManager matchManager, SpectatorManager spectatorManager) {
         this.plugin = plugin;
         this.matchManager = matchManager;
+        this.spectatorManager = spectatorManager;
     }
 
     @Override
@@ -64,6 +71,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 case "tournament", "tour", "t" -> handleTournament(player, args);
                 case "stats" -> handleStats(player, args);
                 case "leaderboard", "top" -> handleLeaderboard(player);
+                case "spectate" -> handleSpectate(player, args);
                 default -> sendUsage(player);
             }
         } catch (IllegalStateException | IllegalArgumentException e) {
@@ -144,6 +152,11 @@ public class MabCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleLeave(Player player) {
+        if (spectatorManager != null && spectatorManager.isSpectating(player.getUniqueId())) {
+            spectatorManager.endSpectate(player.getUniqueId());
+            player.sendMessage("§7Spectator-Mode beendet.");
+            return;
+        }
         Match match = matchManager.getMatchOf(player.getUniqueId());
         if (match == null) {
             player.sendMessage(Component.text("Du bist in keinem Match.", NamedTextColor.RED));
@@ -368,6 +381,30 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleSpectate(Player player, String[] args) {
+        if (spectatorManager == null) {
+            player.sendMessage("§cSpectator-Funktion nicht verfügbar.");
+            return;
+        }
+        if (args.length < 2) {
+            List<String> targets = spectatorManager.listAvailableTargets(player.getUniqueId());
+            if (targets.isEmpty()) {
+                player.sendMessage("§cKeine zuschaubaren Targets verfügbar.");
+            } else {
+                player.sendMessage("§7Verfügbare Targets: §f" + String.join(", ", targets));
+                player.sendMessage("§7Nutze §f/mab spectate <captain>");
+            }
+            return;
+        }
+        String captainName = args[1];
+        Player target = Bukkit.getPlayerExact(captainName);
+        if (target == null) {
+            player.sendMessage("§cSpieler '" + captainName + "' ist nicht online.");
+            return;
+        }
+        spectatorManager.startSpectate(player, target.getUniqueId());
+    }
+
     private String nameOf(UUID id) {
         Player p = Bukkit.getPlayer(id);
         if (p != null) return p.getName();
@@ -405,6 +442,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/mab tournament <create|join|leave|start|list>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab stats [player] — Lifetime-Stats", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leaderboard — Top 10", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab spectate [captain] — Battle zuschauen", NamedTextColor.GRAY));
     }
 
     @Override
@@ -446,6 +484,11 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 plugin.getTournamentManager().listAll().forEach(t -> names.add(t.getName()));
                 return filterByPrefix(names, args[2]);
             }
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("spectate") && sender instanceof Player p) {
+            if (spectatorManager == null) return Collections.emptyList();
+            return filterByPrefix(spectatorManager.listAvailableTargets(p.getUniqueId()), args[1]);
         }
 
         return Collections.emptyList();
