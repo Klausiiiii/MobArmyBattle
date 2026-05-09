@@ -11,10 +11,12 @@ import de.klausiiiii.mobArmyBattle.listener.PlayerDeathFarmListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerRespawnListener;
 import de.klausiiiii.mobArmyBattle.listener.WorldGroupInventoryListener;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
+import de.klausiiiii.mobArmyBattle.spectator.SpectatorManager;
 import de.klausiiiii.mobArmyBattle.stats.StatsDatabase;
 import de.klausiiiii.mobArmyBattle.stats.StatsRecorder;
 import de.klausiiiii.mobArmyBattle.stats.StatsRepository;
 import de.klausiiiii.mobArmyBattle.tournament.TournamentManager;
+import de.klausiiiii.mobArmyBattle.ui.SidebarManager;
 import de.klausiiiii.mobArmyBattle.wave.WaveBuildGui;
 import de.klausiiiii.mobArmyBattle.world.LobbyInventoryManager;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
@@ -33,52 +35,39 @@ public final class MobArmyBattle extends JavaPlugin {
     private TournamentManager tournamentManager;
     private StatsDatabase statsDatabase;
     private StatsRepository statsRepository;
+    private SpectatorManager spectatorManager;
+    private SidebarManager sidebarManager;
 
     @Override
     public void onEnable() {
+        // 1. WorldManager
         worldManager = new WorldManager(this);
         worldManager.cleanupOrphanWorlds();
         worldManager.getOrCreateLobbyWorld();
 
+        // 2. MatchManager
         matchManager = new MatchManager();
 
-        PluginCommand mabCmd = getCommand("mab");
-        if (mabCmd == null) {
-            getLogger().severe("Befehl /mab nicht in plugin.yml deklariert!");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
-        MabCommand mabHandler = new MabCommand(this, matchManager);
-        mabCmd.setExecutor(mabHandler);
-        mabCmd.setTabCompleter(mabHandler);
-
+        // 3. LobbyInventoryManager
         lobbyInventoryManager = new LobbyInventoryManager();
+
+        // 4. TournamentManager
         tournamentManager = new TournamentManager(this, matchManager);
 
-        getServer().getPluginManager().registerEvents(
-                new PlayerConnectionListener(matchManager, worldManager, tournamentManager), this);
-        getServer().getPluginManager().registerEvents(
-                new MobKillListener(matchManager), this);
-        getServer().getPluginManager().registerEvents(
-                new PlayerDeathFarmListener(matchManager), this);
-        getServer().getPluginManager().registerEvents(
-                new PlayerRespawnListener(this, matchManager), this);
-        getServer().getPluginManager().registerEvents(
-                new WorldGroupInventoryListener(lobbyInventoryManager), this);
-
-        waveBuildGui = new WaveBuildGui(matchManager);
-        getServer().getPluginManager().registerEvents(waveBuildGui, this);
-
-        mabMenuGui = new MabMenuGui(this, matchManager);
-        getServer().getPluginManager().registerEvents(mabMenuGui, this);
-
-        bossBarManager = new MatchBossBarManager();
-
+        // 5. BattleManager + BattleEventListener + tournament listener
         battleManager = new BattleManager(this);
         getServer().getPluginManager().registerEvents(
                 new BattleEventListener(battleManager), this);
         battleManager.addBattleEndListener(tournamentManager::onBattleFinished);
 
+        // 6. SpectatorManager (depends on battleManager + tournamentManager)
+        spectatorManager = new SpectatorManager(this, matchManager, battleManager, tournamentManager);
+        battleManager.setSpectatorManager(spectatorManager);
+
+        // 7. SidebarManager (depends on battleManager)
+        sidebarManager = new SidebarManager(battleManager);
+
+        // 8. StatsDatabase + StatsRecorder
         statsDatabase = new StatsDatabase(this);
         try {
             statsDatabase.open();
@@ -90,9 +79,46 @@ public final class MobArmyBattle extends JavaPlugin {
             statsRepository = new StatsRepository(statsDatabase, getLogger());
         }
 
+        // 9. MabCommand (three-arg: plugin, matchManager, spectatorManager)
+        PluginCommand mabCmd = getCommand("mab");
+        if (mabCmd == null) {
+            getLogger().severe("Befehl /mab nicht in plugin.yml deklariert!");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        MabCommand mabHandler = new MabCommand(this, matchManager, spectatorManager);
+        mabCmd.setExecutor(mabHandler);
+        mabCmd.setTabCompleter(mabHandler);
+
+        // 10. PlayerConnectionListener (four-arg: matchManager, worldManager, tournamentManager, spectatorManager)
+        getServer().getPluginManager().registerEvents(
+                new PlayerConnectionListener(matchManager, worldManager, tournamentManager, spectatorManager), this);
+
+        // 11. Other listeners
+        getServer().getPluginManager().registerEvents(
+                new MobKillListener(matchManager), this);
+        getServer().getPluginManager().registerEvents(
+                new PlayerDeathFarmListener(matchManager), this);
+        getServer().getPluginManager().registerEvents(
+                new PlayerRespawnListener(this, matchManager), this);
+        getServer().getPluginManager().registerEvents(
+                new WorldGroupInventoryListener(lobbyInventoryManager), this);
+
+        // 12. WaveBuildGui + MabMenuGui
+        waveBuildGui = new WaveBuildGui(matchManager);
+        getServer().getPluginManager().registerEvents(waveBuildGui, this);
+
+        mabMenuGui = new MabMenuGui(this, matchManager);
+        getServer().getPluginManager().registerEvents(mabMenuGui, this);
+
+        // 13. BossBarManager
+        bossBarManager = new MatchBossBarManager();
+
+        // 14. Scheduler: tick all managers
         getServer().getScheduler().runTaskTimer(this, () -> {
             matchManager.tickAll();
             bossBarManager.tickAll(matchManager.getActiveMatches());
+            sidebarManager.tickAll(matchManager.getActiveMatches());
         }, 20L, 20L);
 
         getLogger().info("MobArmyBattle aktiviert.");
@@ -102,6 +128,9 @@ public final class MobArmyBattle extends JavaPlugin {
     public void onDisable() {
         if (bossBarManager != null) {
             bossBarManager.clear();
+        }
+        if (sidebarManager != null) {
+            sidebarManager.clear();
         }
         if (statsDatabase != null) {
             statsDatabase.close();
@@ -139,5 +168,13 @@ public final class MobArmyBattle extends JavaPlugin {
 
     public StatsRepository getStatsRepository() {
         return statsRepository;
+    }
+
+    public SpectatorManager getSpectatorManager() {
+        return spectatorManager;
+    }
+
+    public SidebarManager getSidebarManager() {
+        return sidebarManager;
     }
 }

@@ -27,3 +27,6 @@ permissions:
   mobarmybattle.admin:
     default: op
     description: Admin commands
+  mobarmybattle.spectate:
+    description: Erlaubt /mab spectate
+    default: true
