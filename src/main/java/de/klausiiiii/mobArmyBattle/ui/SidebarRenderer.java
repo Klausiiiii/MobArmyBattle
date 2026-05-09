@@ -33,10 +33,28 @@ public final class SidebarRenderer {
         MatchPhaseType phase = match.getCurrentPhase().getType();
         return switch (phase) {
             case FARM -> renderFarm(match, viewer, currentTimeMs);
-            case WAVE_BUILD -> List.of();  // Task 2
+            case WAVE_BUILD -> renderWaveBuild(match, viewer, currentTimeMs);
             case BATTLE -> List.of();       // Task 3
             default -> List.of();           // LOBBY/FINISHED → empty
         };
+    }
+
+    private static List<String> renderWaveBuild(Match match, Team viewer, long currentTimeMs) {
+        List<String> lines = new ArrayList<>();
+        lines.add("§e§lMobArmyBattle");
+        lines.add("§7Phase: §eWelle bauen");
+        lines.add("§7Zeit: §f" + formatElapsed(match.getPhaseStartedAt(), currentTimeMs));
+        lines.add(SEP);
+        lines.add(waveLine(1, viewer.getWave1().totalMobCount()));
+        lines.add(waveLine(2, viewer.getWave2().totalMobCount()));
+        lines.add(SEP);
+        lines.add("§7Teams aktiv: " + activeTeamCount(match) + "/" + match.getTeams().size());
+        return lines;
+    }
+
+    private static String waveLine(int n, int count) {
+        String color = count == 0 ? "§c" : "§f";
+        return "§7Welle " + n + ": " + color + count + " Mobs";
     }
 
     private static List<String> renderFarm(Match match, Team viewer, long currentTimeMs) {
