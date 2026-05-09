@@ -17,6 +17,18 @@ public final class SidebarRenderer {
 
     private SidebarRenderer() {}
 
+    /**
+     * Renders the sidebar lines for a player viewing a match.
+     *
+     * @param match       current match (must be non-null, must not be in LOBBY/FINISHED)
+     * @param viewer      the team whose data to render (must be non-null)
+     * @param battleCtx   battle-phase data (mob counts, kills, pair partner). May be null
+     *                    in non-BATTLE phases. Must be non-null in BATTLE phase, otherwise
+     *                    a placeholder line is shown.
+     * @param currentTimeMs current wall-clock millis for elapsed-time calculation
+     * @return ordered list of sidebar lines (top to bottom), max 14 entries.
+     *         Empty list for LOBBY/FINISHED phases.
+     */
     public static List<String> render(Match match, Team viewer, BattleContext battleCtx, long currentTimeMs) {
         MatchPhaseType phase = match.getCurrentPhase().getType();
         return switch (phase) {
@@ -54,7 +66,7 @@ public final class SidebarRenderer {
         String type = entry.getEntityTypeName();
         String pretty = type.charAt(0) + type.substring(1).toLowerCase().replace('_', ' ');
         if (!"none|none|none|none|none|none".equals(entry.getEquipmentSignature())) {
-            pretty = pretty + " (geared)";
+            pretty = pretty + " (ausgerüstet)";
         }
         return pretty;
     }
@@ -65,7 +77,7 @@ public final class SidebarRenderer {
         return n;
     }
 
-    static String formatElapsed(long startMs, long nowMs) {
+    private static String formatElapsed(long startMs, long nowMs) {
         long sec = Math.max(0, (nowMs - startMs) / 1000);
         return String.format("%02d:%02d", sec / 60, sec % 60);
     }
