@@ -105,7 +105,7 @@ public final class MobArmyBattle extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new MobKillListener(matchManager), this);
         getServer().getPluginManager().registerEvents(
-                new PlayerDeathFarmListener(matchManager), this);
+                new PlayerDeathFarmListener(matchManager, this), this);
         getServer().getPluginManager().registerEvents(
                 new PlayerRespawnListener(this, matchManager), this);
         getServer().getPluginManager().registerEvents(

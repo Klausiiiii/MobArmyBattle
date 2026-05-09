@@ -1,5 +1,7 @@
 package de.klausiiiii.mobArmyBattle.listener;
 
+import de.klausiiiii.mobArmyBattle.MobArmyBattle;
+import de.klausiiiii.mobArmyBattle.config.DeathPenaltyConfig;
 import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
@@ -14,12 +16,16 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 
 public class PlayerDeathFarmListener implements Listener {
 
-    private static final int DEFAULT_PENALTY_PERCENT = 10;
-
     private final MatchManager matchManager;
+    private final MobArmyBattle plugin;
 
     public PlayerDeathFarmListener(MatchManager matchManager) {
+        this(matchManager, null);
+    }
+
+    public PlayerDeathFarmListener(MatchManager matchManager, MobArmyBattle plugin) {
         this.matchManager = matchManager;
+        this.plugin = plugin;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -32,11 +38,18 @@ public class PlayerDeathFarmListener implements Listener {
         Team team = match.findTeamOf(player.getUniqueId());
         if (team == null) return;
 
-        int lost = team.getPool().applyPenalty(DEFAULT_PENALTY_PERCENT);
-        if (lost > 0) {
-            player.sendMessage(Component.text(
-                    "Tod-Strafe: " + lost + " Mobs aus dem Team-Pool verloren.",
-                    NamedTextColor.RED));
+        DeathPenaltyConfig.Mode mode = plugin != null
+                ? plugin.getMabConfig().deathPenalty().mode()
+                : DeathPenaltyConfig.Mode.SOFT;  // legacy default
+        int penaltyPercent = mode.poolPercent();
+        if (penaltyPercent > 0) {
+            int lost = team.getPool().applyPenalty(penaltyPercent);
+            if (lost > 0) {
+                player.sendMessage(Component.text(
+                        "Tod-Strafe: " + lost + " Mobs aus dem Team-Pool verloren (" + penaltyPercent + "%).",
+                        NamedTextColor.RED));
+            }
         }
+        event.setKeepInventory(!mode.dropItems());
     }
 }
