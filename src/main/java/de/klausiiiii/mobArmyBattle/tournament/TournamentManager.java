@@ -69,6 +69,13 @@ public class TournamentManager {
         return Collections.unmodifiableList(new ArrayList<>(byName.values()));
     }
 
+    public Tournament findEliminatedTournamentOf(UUID playerId) {
+        for (Tournament t : byName.values()) {
+            if (t.isEliminated(playerId)) return t;
+        }
+        return null;
+    }
+
     public void join(String name, UUID captainId) {
         Tournament t = getByName(name);
         if (t == null) {
