@@ -65,5 +65,20 @@ public class FarmPhase implements MatchPhase {
 
     @Override
     public void tick(Match match) {
+        if (plugin == null) return;
+        var phases = plugin.getMabConfig().phaseDurations();
+        if (!phases.autoFarmTransition()) return;
+        long elapsedMs = System.currentTimeMillis() - match.getPhaseStartedAt();
+        long durationMs = phases.farmDurationMin() * 60_000L;
+        if (elapsedMs < durationMs) return;
+        match.transitionTo(new WaveBuildPhase(plugin));
+        for (Team t : match.getTeams()) {
+            for (UUID memberId : t.getMemberIds()) {
+                Player member = Bukkit.getPlayer(memberId);
+                if (member != null) {
+                    member.sendMessage("§6Farm-Phase beendet — Captains bauen jetzt Wellen.");
+                }
+            }
+        }
     }
 }
