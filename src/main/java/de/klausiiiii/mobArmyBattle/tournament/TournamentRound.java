@@ -2,7 +2,9 @@ package de.klausiiiii.mobArmyBattle.tournament;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class TournamentRound {
@@ -56,5 +58,19 @@ public class TournamentRound {
         }
         if (byeCaptain != null) winners.add(byeCaptain);
         return winners;
+    }
+
+    public Set<UUID> activeCaptains() {
+        Set<UUID> active = new HashSet<>();
+        for (TournamentPairing p : pairings) {
+            if (p.isFinished()) {
+                if (p.getWinner() != null) active.add(p.getWinner());
+            } else {
+                active.add(p.getCaptainA());
+                active.add(p.getCaptainB());
+            }
+        }
+        if (byeCaptain != null) active.add(byeCaptain);
+        return active;
     }
 }

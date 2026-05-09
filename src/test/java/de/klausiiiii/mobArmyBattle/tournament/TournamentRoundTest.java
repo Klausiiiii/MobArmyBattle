@@ -89,4 +89,36 @@ class TournamentRoundTest {
         assertSame(p, round.findPairingForCaptain(b));
         assertNull(round.findPairingForCaptain(c));
     }
+
+    @Test
+    void activeCaptainsIncludesUnfinishedPairings() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        TournamentPairing p = new TournamentPairing(a, b);
+        p.setMatchId("match-1");
+        TournamentRound r = new TournamentRound(1, java.util.List.of(p), null);
+
+        assertEquals(java.util.Set.of(a, b), r.activeCaptains());
+    }
+
+    @Test
+    void activeCaptainsExcludesLoser() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        TournamentPairing p = new TournamentPairing(a, b);
+        p.setMatchId("match-1");
+        p.setWinner(a);
+        TournamentRound r = new TournamentRound(1, java.util.List.of(p), null);
+
+        assertEquals(java.util.Set.of(a), r.activeCaptains());
+    }
+
+    @Test
+    void activeCaptainsIncludesByeCaptain() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID(), bye = UUID.randomUUID();
+        TournamentPairing p = new TournamentPairing(a, b);
+        p.setMatchId("match-1");
+        TournamentRound r = new TournamentRound(1, java.util.List.of(p), bye);
+
+        assertTrue(r.activeCaptains().contains(bye));
+        assertEquals(3, r.activeCaptains().size());
+    }
 }
