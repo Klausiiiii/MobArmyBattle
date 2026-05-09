@@ -19,6 +19,7 @@ public class BattleSession {
         public final List<Location> spawnPoints;
         public final BattleStats stats;
         public int currentWaveNumber = 0;
+        public int currentWaveSpawnedTotal = 0;
         public final Set<UUID> aliveLivingMobs = new HashSet<>();
         public final Set<UUID> downedPlayers = new HashSet<>();
 

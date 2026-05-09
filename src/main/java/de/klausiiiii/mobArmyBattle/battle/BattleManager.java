@@ -106,7 +106,17 @@ public class BattleManager {
             state.aliveLivingMobs.add(m.getUniqueId());
             sessionByMobUUID.put(m.getUniqueId(), session);
         }
+        state.currentWaveSpawnedTotal = mobs.size();
         broadcastTeam(state.team, "§6Welle " + state.currentWaveNumber + " gestartet — " + mobs.size() + " Mobs.");
+    }
+
+    public BattleSession getSessionByPlayer(UUID playerUUID) {
+        for (java.util.List<BattleSession> sessions : matchSessions.values()) {
+            for (BattleSession session : sessions) {
+                if (session.getStateByPlayerUUID(playerUUID) != null) return session;
+            }
+        }
+        return null;
     }
 
     public void onMobKilled(UUID mobUUID, UUID killerUUID) {
