@@ -1,7 +1,7 @@
 package de.klausiiiii.mobArmyBattle.ui;
 
 import de.klausiiiii.mobArmyBattle.match.Team;
-import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -46,7 +46,8 @@ public final class Notifications {
     }
 
     private static void sendTeam(Team team, String title, String subtitle, Sound sound) {
-        Title t = Title.title(Component.text(title), Component.text(subtitle), TIMES);
+        LegacyComponentSerializer legacy = LegacyComponentSerializer.legacySection();
+        Title t = Title.title(legacy.deserialize(title), legacy.deserialize(subtitle), TIMES);
         for (UUID id : team.getMemberIds()) {
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
