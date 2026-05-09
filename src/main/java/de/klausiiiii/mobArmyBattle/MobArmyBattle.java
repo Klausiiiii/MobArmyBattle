@@ -119,7 +119,7 @@ public final class MobArmyBattle extends JavaPlugin {
         getServer().getPluginManager().registerEvents(mabMenuGui, this);
 
         // 13. BossBarManager
-        bossBarManager = new MatchBossBarManager();
+        bossBarManager = new MatchBossBarManager(this);
 
         // 14. Scheduler: tick all managers
         getServer().getScheduler().runTaskTimer(this, () -> {

@@ -20,8 +20,15 @@ import java.util.UUID;
 
 public class MatchBossBarManager {
 
-    private static final int FARM_DURATION_SEC = 60 * 60;
-    private static final int WAVE_BUILD_DURATION_SEC = 5 * 60;
+    private final de.klausiiiii.mobArmyBattle.MobArmyBattle plugin;
+
+    public MatchBossBarManager() {
+        this(null);
+    }
+
+    public MatchBossBarManager(de.klausiiiii.mobArmyBattle.MobArmyBattle plugin) {
+        this.plugin = plugin;
+    }
 
     private static class BarEntry {
         BossBar bar;
@@ -110,10 +117,18 @@ public class MatchBossBarManager {
         entries.clear();
     }
 
-    private static int durationFor(MatchPhaseType phase) {
+    private int durationFor(MatchPhaseType phase) {
+        if (plugin == null) {
+            return switch (phase) {
+                case FARM -> 60 * 60;
+                case WAVE_BUILD -> 5 * 60;
+                default -> -1;
+            };
+        }
+        var phases = plugin.getMabConfig().phaseDurations();
         return switch (phase) {
-            case FARM -> FARM_DURATION_SEC;
-            case WAVE_BUILD -> WAVE_BUILD_DURATION_SEC;
+            case FARM -> phases.farmDurationMin() * 60;
+            case WAVE_BUILD -> phases.waveBuildDurationMin() * 60;
             default -> -1;
         };
     }
