@@ -3,6 +3,7 @@ package de.klausiiiii.mobArmyBattle.world;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.GameRules;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -43,6 +44,7 @@ public class WorldManager {
         World existing = Bukkit.getWorld(LOBBY_WORLD_NAME);
         if (existing != null) {
             lobbyWorld = existing;
+            applyLobbySettings(existing);
             return existing;
         }
 
@@ -54,9 +56,15 @@ public class WorldManager {
             throw new IllegalStateException("Konnte Lobby-Welt nicht erstellen");
         }
         lobbyWorld.setSpawnLocation(0, LOBBY_SPAWN_Y, 0);
+        applyLobbySettings(lobbyWorld);
         buildLobbyPlatform(lobbyWorld);
         log.info("Lobby-Welt initialisiert: " + LOBBY_WORLD_NAME);
         return lobbyWorld;
+    }
+
+    private void applyLobbySettings(World world) {
+        world.setTime(6000);
+        world.setGameRule(GameRules.ADVANCE_TIME, false);
     }
 
     private void buildLobbyPlatform(World world) {
@@ -85,8 +93,20 @@ public class WorldManager {
         if (world == null) {
             throw new IllegalStateException("Konnte Farm-Welt nicht erstellen: " + name);
         }
-        world.setKeepSpawnInMemory(false);
         log.info("Farm-Welt erstellt: " + name + " (seed=" + seed + ")");
+        return world;
+    }
+
+    public World createArenaWorld(String matchId, String teamId) {
+        String name = ARENA_WORLD_PREFIX + matchId + "_" + teamId;
+        WorldCreator creator = new WorldCreator(name)
+                .generator(new LobbyChunkGenerator())
+                .type(WorldType.FLAT);
+        World world = Bukkit.createWorld(creator);
+        if (world == null) {
+            throw new IllegalStateException("Konnte Arena-Welt nicht erstellen: " + name);
+        }
+        log.info("Arena-Welt erstellt: " + name);
         return world;
     }
 
@@ -137,5 +157,15 @@ public class WorldManager {
 
     public static long generateSharedSeed() {
         return new Random().nextLong();
+    }
+
+    public static Location safeSpawnAt(World world, int x, int z) {
+        int chunkX = x >> 4;
+        int chunkZ = z >> 4;
+        if (!world.isChunkLoaded(chunkX, chunkZ)) {
+            world.getChunkAt(chunkX, chunkZ);
+        }
+        int y = world.getHighestBlockYAt(x, z);
+        return new Location(world, x + 0.5, y + 1.0, z + 0.5);
     }
 }

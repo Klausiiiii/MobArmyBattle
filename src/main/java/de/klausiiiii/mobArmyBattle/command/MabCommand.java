@@ -45,7 +45,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            sendUsage(player);
+            plugin.getMabMenuGui().open(player);
             return true;
         }
 

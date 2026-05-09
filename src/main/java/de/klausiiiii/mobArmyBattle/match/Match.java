@@ -17,6 +17,7 @@ public class Match {
     private final List<Team> teams;
     private final Map<Team, String> farmWorldNames;
     private MatchPhase currentPhase;
+    private long phaseStartedAt;
 
     public Match(String id) {
         this(id, new Random().nextLong(), 1);
@@ -38,6 +39,7 @@ public class Match {
         this.maxTeamSize = maxTeamSize;
         this.teams = new ArrayList<>();
         this.farmWorldNames = new HashMap<>();
+        this.phaseStartedAt = System.currentTimeMillis();
         this.currentPhase = new LobbyPhase();
         this.currentPhase.onEnter(this);
     }
@@ -103,7 +105,12 @@ public class Match {
         }
         currentPhase.onExit(this);
         currentPhase = newPhase;
+        phaseStartedAt = System.currentTimeMillis();
         currentPhase.onEnter(this);
+    }
+
+    public long getPhaseStartedAt() {
+        return phaseStartedAt;
     }
 
     public void tick() {

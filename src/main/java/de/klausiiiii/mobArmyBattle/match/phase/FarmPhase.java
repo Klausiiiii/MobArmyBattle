@@ -41,11 +41,13 @@ public class FarmPhase implements MatchPhase {
             String teamId = "team-" + (teamIdx++);
             World farmWorld = wm.createFarmWorld(match.getId(), teamId, match.getSeed());
             match.setFarmWorldName(team, farmWorld.getName());
-            Location spawn = farmWorld.getSpawnLocation();
+            Location raw = farmWorld.getSpawnLocation();
+            Location safe = WorldManager.safeSpawnAt(farmWorld, raw.getBlockX(), raw.getBlockZ());
+            farmWorld.setSpawnLocation(safe);
             for (UUID memberId : team.getMemberIds()) {
                 Player member = Bukkit.getPlayer(memberId);
                 if (member != null) {
-                    member.teleport(spawn);
+                    member.teleport(safe);
                 }
             }
         }
