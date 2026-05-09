@@ -3,6 +3,7 @@ package de.klausiiiii.mobArmyBattle;
 import de.klausiiiii.mobArmyBattle.battle.BattleManager;
 import de.klausiiiii.mobArmyBattle.config.ConfigLoader;
 import de.klausiiiii.mobArmyBattle.config.MabConfig;
+import de.klausiiiii.mobArmyBattle.config.ReconnectGraceManager;
 import de.klausiiiii.mobArmyBattle.bossbar.MatchBossBarManager;
 import de.klausiiiii.mobArmyBattle.command.MabCommand;
 import de.klausiiiii.mobArmyBattle.command.MabMenuGui;
@@ -40,6 +41,7 @@ public final class MobArmyBattle extends JavaPlugin {
     private StatsRepository statsRepository;
     private SpectatorManager spectatorManager;
     private SidebarManager sidebarManager;
+    private ReconnectGraceManager reconnectGraceManager;
 
     @Override
     public void onEnable() {
@@ -74,6 +76,9 @@ public final class MobArmyBattle extends JavaPlugin {
         // 7. SidebarManager (depends on battleManager)
         sidebarManager = new SidebarManager(battleManager);
 
+        // 7a. ReconnectGraceManager (depends on matchManager + mabConfig)
+        reconnectGraceManager = new ReconnectGraceManager(this, matchManager);
+
         // 8. StatsDatabase + StatsRecorder
         statsDatabase = new StatsDatabase(this);
         try {
@@ -97,9 +102,9 @@ public final class MobArmyBattle extends JavaPlugin {
         mabCmd.setExecutor(mabHandler);
         mabCmd.setTabCompleter(mabHandler);
 
-        // 10. PlayerConnectionListener (four-arg: matchManager, worldManager, tournamentManager, spectatorManager)
+        // 10. PlayerConnectionListener (five-arg: matchManager, worldManager, tournamentManager, spectatorManager, reconnectGraceManager)
         getServer().getPluginManager().registerEvents(
-                new PlayerConnectionListener(matchManager, worldManager, tournamentManager, spectatorManager), this);
+                new PlayerConnectionListener(matchManager, worldManager, tournamentManager, spectatorManager, reconnectGraceManager), this);
 
         // 11. Other listeners
         getServer().getPluginManager().registerEvents(
@@ -133,6 +138,9 @@ public final class MobArmyBattle extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (reconnectGraceManager != null) {
+            reconnectGraceManager.cancelAll();
+        }
         if (bossBarManager != null) {
             bossBarManager.clear();
         }
@@ -187,6 +195,10 @@ public final class MobArmyBattle extends JavaPlugin {
 
     public MabConfig getMabConfig() {
         return mabConfig;
+    }
+
+    public ReconnectGraceManager getReconnectGraceManager() {
+        return reconnectGraceManager;
     }
 
     public void reloadMabConfig() {
