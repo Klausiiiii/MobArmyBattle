@@ -5,6 +5,7 @@ import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchPhase;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
+import de.klausiiiii.mobArmyBattle.ui.Notifications;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -76,6 +77,9 @@ public class WaveBuildPhase implements MatchPhase {
                 }
                 plugin.getWaveBuildGui().open(captain);
             }
+        }
+        for (Team t : match.getTeams()) {
+            Notifications.waveBuildStart(t);
         }
     }
 

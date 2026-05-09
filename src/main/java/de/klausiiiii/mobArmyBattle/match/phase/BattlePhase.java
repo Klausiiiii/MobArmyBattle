@@ -4,6 +4,8 @@ import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchPhase;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
+import de.klausiiiii.mobArmyBattle.match.Team;
+import de.klausiiiii.mobArmyBattle.ui.Notifications;
 
 public class BattlePhase implements MatchPhase {
 
@@ -22,6 +24,9 @@ public class BattlePhase implements MatchPhase {
     public void onEnter(Match match) {
         if (plugin == null) return;
         plugin.getBattleManager().startBattlesFor(match);
+        for (Team t : match.getTeams()) {
+            Notifications.battleStart(t);
+        }
     }
 
     @Override

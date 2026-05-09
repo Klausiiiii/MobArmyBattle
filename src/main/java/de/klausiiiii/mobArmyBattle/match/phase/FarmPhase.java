@@ -5,6 +5,7 @@ import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchPhase;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
+import de.klausiiiii.mobArmyBattle.ui.Notifications;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -50,6 +51,9 @@ public class FarmPhase implements MatchPhase {
                     member.teleport(safe);
                 }
             }
+        }
+        for (Team t : match.getTeams()) {
+            Notifications.farmStart(t);
         }
     }
 
