@@ -46,7 +46,8 @@ public class PlayerConnectionListener implements Listener {
         UUID id = event.getPlayer().getUniqueId();
         if (spectatorManager != null && spectatorManager.isSpectating(id)) {
             spectatorManager.endSpectate(id);
-            return;
+            // Fall through to existing match/tournament cleanup — pair-partner spectators
+            // are still match members and need their team membership cleaned up.
         }
         if (tournamentManager != null) {
             tournamentManager.onCaptainQuit(id);
