@@ -3,6 +3,8 @@ package de.klausiiiii.mobArmyBattle.battle;
 import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.Team;
+import de.klausiiiii.mobArmyBattle.spectator.SpectatorManager;
+import de.klausiiiii.mobArmyBattle.ui.Notifications;
 import de.klausiiiii.mobArmyBattle.wave.Wave;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.Bukkit;
@@ -29,6 +31,11 @@ public class BattleManager {
     private final Map<UUID, BattleSession> sessionByMobUUID = new HashMap<>();
     private final List<BiConsumer<Match, UUID>> battleEndListeners = new ArrayList<>();
     private final List<BiConsumer<Match, List<TeamOutcome>>> matchCompletedListeners = new ArrayList<>();
+    private SpectatorManager spectatorManager;
+
+    public void setSpectatorManager(SpectatorManager mgr) {
+        this.spectatorManager = mgr;
+    }
 
     public BattleManager(MobArmyBattle plugin) {
         this.plugin = plugin;
@@ -108,6 +115,7 @@ public class BattleManager {
         }
         state.currentWaveSpawnedTotal = mobs.size();
         broadcastTeam(state.team, "§6Welle " + state.currentWaveNumber + " gestartet — " + mobs.size() + " Mobs.");
+        Notifications.waveSpawned(state.team, state.currentWaveNumber, mobs.size());
     }
 
     public BattleSession getSessionByPlayer(UUID playerUUID) {
@@ -139,11 +147,13 @@ public class BattleManager {
     private void checkAdvance(BattleSession session, BattleSession.TeamState state) {
         if (state.currentWaveNumber >= 2) {
             if (!state.stats.isFinished()) {
+                Notifications.wavePassed(state.team, state.currentWaveNumber);
                 state.stats.markFinished(session.elapsedMs());
                 broadcastTeam(state.team, "§aDu hast beide Wellen überlebt!");
             }
             checkSessionEnd(session);
         } else {
+            Notifications.wavePassed(state.team, state.currentWaveNumber);
             startNextWave(session, state);
         }
     }
@@ -196,6 +206,7 @@ public class BattleManager {
         List<BattleSession> all = matchSessions.get(match.getId());
         if (all != null && all.stream().allMatch(BattleSession::isConcluded)) {
             notifyMatchCompleted(match, all);
+            if (spectatorManager != null) spectatorManager.evictAll(match.getId());
             match.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.FinishedPhase(plugin));
         }
     }
@@ -245,6 +256,15 @@ public class BattleManager {
         }
         broadcastTeam(a.team, msg);
         broadcastTeam(b.team, msg);
+        String aName = teamName(a.team);
+        String bName = teamName(b.team);
+        if (winner == BattleResult.Winner.A) {
+            Notifications.victory(a.team, aName);
+            Notifications.defeat(b.team, aName);
+        } else if (winner == BattleResult.Winner.B) {
+            Notifications.victory(b.team, bName);
+            Notifications.defeat(a.team, bName);
+        }
     }
 
     private String teamName(Team team) {
@@ -267,6 +287,9 @@ public class BattleManager {
         for (BattleSession s : sessions) {
             for (UUID mob : s.getStateA().aliveLivingMobs) sessionByMobUUID.remove(mob);
             for (UUID mob : s.getStateB().aliveLivingMobs) sessionByMobUUID.remove(mob);
+        }
+        if (spectatorManager != null) {
+            spectatorManager.evictAll(match.getId());
         }
     }
 }
