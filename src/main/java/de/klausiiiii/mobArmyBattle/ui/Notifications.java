@@ -37,6 +37,16 @@ public final class Notifications {
         sendTeam(team, "§a§lWelle " + waveNumber + " bestanden", "", Sound.UI_TOAST_CHALLENGE_COMPLETE);
     }
 
+    public static void wavePrep(Team team, int waveNumber, int prepSec) {
+        sendTeam(team, "§e§lBauphase", "§7Welle " + waveNumber + " in " + prepSec + "s",
+                Sound.BLOCK_NOTE_BLOCK_BELL);
+    }
+
+    public static void waveTimedOut(Team team, int waveNumber) {
+        sendTeam(team, "§c§lZeit abgelaufen!", "§7Welle " + waveNumber + " verloren",
+                Sound.ENTITY_VILLAGER_NO);
+    }
+
     public static void victory(Team team, String winnerTeamName) {
         sendTeam(team, "§6§lSIEG", "§7" + winnerTeamName, Sound.UI_TOAST_CHALLENGE_COMPLETE);
     }
