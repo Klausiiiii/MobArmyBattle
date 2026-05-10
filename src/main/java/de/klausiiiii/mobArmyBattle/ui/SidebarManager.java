@@ -65,6 +65,10 @@ public class SidebarManager {
                 ? oppCaptainPlayer.getName()
                 : (oppCaptain != null ? oppCaptain.toString().substring(0, 8) : "?");
         int alive = team.getMemberIds().size() - own.downedPlayers.size();
+        boolean inPrep = own.prepTask != null && own.prepEndsAt > 0L;
+        int prepLeft = inPrep
+                ? (int) Math.max(0L, (own.prepEndsAt - System.currentTimeMillis()) / 1000L)
+                : 0;
         return new BattleContext(
                 own.aliveLivingMobs.size(),
                 own.currentWaveSpawnedTotal,
@@ -73,8 +77,8 @@ public class SidebarManager {
                 team.getMemberIds().size(),
                 own.currentWaveNumber,
                 pairName,
-                false,
-                0);
+                inPrep,
+                prepLeft);
     }
 
     private void apply(Player player, List<String> lines) {
