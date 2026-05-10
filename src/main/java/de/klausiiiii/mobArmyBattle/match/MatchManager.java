@@ -186,7 +186,8 @@ public class MatchManager {
      */
     public void forceCancelMatch(Match match,
                                  de.klausiiiii.mobArmyBattle.battle.BattleManager battleManager,
-                                 de.klausiiiii.mobArmyBattle.spectator.SpectatorManager spectatorManager) {
+                                 de.klausiiiii.mobArmyBattle.spectator.SpectatorManager spectatorManager,
+                                 de.klausiiiii.mobArmyBattle.world.WorldManager worldManager) {
         if (match == null) return;
         // Evict spectators first (they may be in arena worlds that get cleaned up)
         if (spectatorManager != null) {
@@ -202,6 +203,13 @@ public class MatchManager {
             allMembers.addAll(t.getMemberIds());
         }
         for (java.util.UUID id : allMembers) {
+            org.bukkit.entity.Player p = org.bukkit.Bukkit.getPlayer(id);
+            if (p != null) {
+                p.sendMessage("§cMatch wurde von einem Admin abgebrochen.");
+                if (worldManager != null) {
+                    worldManager.teleportToLobby(p);
+                }
+            }
             forceRemove(id);
         }
         // Match-level cleanup (forceRemove may have already removed it if last

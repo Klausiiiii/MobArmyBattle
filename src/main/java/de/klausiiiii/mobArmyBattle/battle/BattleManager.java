@@ -164,8 +164,11 @@ public class BattleManager {
             schedulePrep(session, state, state.currentWaveNumber + 1);
             return;
         }
-        Bukkit.getScheduler().runTaskLater(plugin,
-                () -> schedulePrep(session, state, state.currentWaveNumber + 1),
+        state.wavePauseTask = Bukkit.getScheduler().runTaskLater(plugin,
+                () -> {
+                    state.wavePauseTask = null;
+                    schedulePrep(session, state, state.currentWaveNumber + 1);
+                },
                 pauseSec * 20L);
     }
 
@@ -177,6 +180,10 @@ public class BattleManager {
         if (state.hardTimeoutTask != null) {
             state.hardTimeoutTask.cancel();
             state.hardTimeoutTask = null;
+        }
+        if (state.wavePauseTask != null) {
+            state.wavePauseTask.cancel();
+            state.wavePauseTask = null;
         }
         state.prepEndsAt = 0L;
     }

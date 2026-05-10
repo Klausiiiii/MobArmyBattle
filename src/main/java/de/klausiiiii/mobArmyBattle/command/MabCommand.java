@@ -494,6 +494,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             return;
         }
         matchManager.leaveMatch(target.getUniqueId());
+        plugin.getWorldManager().teleportToLobby(target);
         target.sendMessage("§eDu wurdest aus dem Team gekickt.");
         player.sendMessage("§a" + target.getName() + " wurde gekickt.");
     }
@@ -513,9 +514,14 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§cKein Match mit ID '" + matchId + "'.");
             return;
         }
+        de.klausiiiii.mobArmyBattle.tournament.TournamentManager tm = plugin.getTournamentManager();
+        if (tm != null && tm.getTournamentByMatchId(matchId) != null) {
+            player.sendMessage("§eWarnung: Match ist Teil eines Tournaments. Tournament wird stalled bleiben.");
+        }
         matchManager.forceCancelMatch(match,
                 plugin.getBattleManager(),
-                plugin.getSpectatorManager());
+                plugin.getSpectatorManager(),
+                plugin.getWorldManager());
         player.sendMessage("§aMatch " + matchId + " wurde abgebrochen.");
     }
 
