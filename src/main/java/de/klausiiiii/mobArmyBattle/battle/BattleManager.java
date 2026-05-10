@@ -67,8 +67,8 @@ public class BattleManager {
             teleportTeam(pair.getTeamA(), arenaA);
             teleportTeam(pair.getTeamB(), arenaB);
 
-            startNextWave(session, session.getStateA());
-            startNextWave(session, session.getStateB());
+            schedulePrep(session, session.getStateA(), 1);
+            schedulePrep(session, session.getStateB(), 1);
 
             sessions.add(session);
         }
@@ -99,8 +99,25 @@ public class BattleManager {
         }
     }
 
-    private void startNextWave(BattleSession session, BattleSession.TeamState state) {
-        state.currentWaveNumber++;
+    private void schedulePrep(BattleSession session, BattleSession.TeamState state, int waveNum) {
+        state.currentWaveNumber = waveNum;
+        int prepSec = plugin != null ? plugin.getMabConfig().phaseDurations().prepDurationSec() : 30;
+        state.prepEndsAt = System.currentTimeMillis() + prepSec * 1000L;
+        de.klausiiiii.mobArmyBattle.ui.Notifications.wavePrep(state.team, waveNum, prepSec);
+        broadcastTeam(state.team, "§eBauphase: Welle " + waveNum + " in " + prepSec + "s.");
+        if (plugin != null) {
+            state.prepTask = Bukkit.getScheduler().runTaskLater(plugin,
+                    () -> spawnWaveActual(session, state),
+                    prepSec * 20L);
+        } else {
+            // tests: invoke directly
+            spawnWaveActual(session, state);
+        }
+    }
+
+    private void spawnWaveActual(BattleSession session, BattleSession.TeamState state) {
+        state.prepTask = null;
+        state.prepEndsAt = 0L;
         Wave wave = state.currentWaveNumber == 1 ? state.opponent.getWave1() : state.opponent.getWave2();
         if (wave == null || wave.isForfeited() || wave.totalMobCount() == 0) {
             broadcastTeam(state.team, "§eGegner-Welle " + state.currentWaveNumber + " ist leer/forfeit — übersprungen.");
@@ -114,8 +131,54 @@ public class BattleManager {
             sessionByMobUUID.put(m.getUniqueId(), session);
         }
         state.currentWaveSpawnedTotal = mobs.size();
+        state.currentWaveSpawnAt = System.currentTimeMillis();
         broadcastTeam(state.team, "§6Welle " + state.currentWaveNumber + " gestartet — " + mobs.size() + " Mobs.");
-        Notifications.waveSpawned(state.team, state.currentWaveNumber, mobs.size());
+        de.klausiiiii.mobArmyBattle.ui.Notifications.waveSpawned(state.team, state.currentWaveNumber, mobs.size());
+        int hardTimeoutMin = plugin != null ? plugin.getMabConfig().phaseDurations().waveHardTimeoutMin() : 10;
+        if (plugin != null) {
+            state.hardTimeoutTask = Bukkit.getScheduler().runTaskLater(plugin,
+                    () -> onHardTimeout(session, state),
+                    hardTimeoutMin * 60L * 20L);
+        }
+    }
+
+    private void onHardTimeout(BattleSession session, BattleSession.TeamState state) {
+        state.hardTimeoutTask = null;
+        for (UUID mobUUID : new java.util.HashSet<>(state.aliveLivingMobs)) {
+            sessionByMobUUID.remove(mobUUID);
+            org.bukkit.entity.Entity e = Bukkit.getEntity(mobUUID);
+            if (e != null) e.remove();
+        }
+        state.aliveLivingMobs.clear();
+        de.klausiiiii.mobArmyBattle.ui.Notifications.waveTimedOut(state.team, state.currentWaveNumber);
+        broadcastTeam(state.team, "§cZeit abgelaufen — Welle " + state.currentWaveNumber + " verloren.");
+        if (!state.stats.isFinished()) {
+            state.stats.markFinished(session.elapsedMs());
+        }
+        checkSessionEnd(session);
+    }
+
+    private void scheduleWavePause(BattleSession session, BattleSession.TeamState state) {
+        int pauseSec = plugin != null ? plugin.getMabConfig().phaseDurations().wavePauseSec() : 10;
+        if (pauseSec <= 0 || plugin == null) {
+            schedulePrep(session, state, state.currentWaveNumber + 1);
+            return;
+        }
+        Bukkit.getScheduler().runTaskLater(plugin,
+                () -> schedulePrep(session, state, state.currentWaveNumber + 1),
+                pauseSec * 20L);
+    }
+
+    private void cancelTasks(BattleSession.TeamState state) {
+        if (state.prepTask != null) {
+            state.prepTask.cancel();
+            state.prepTask = null;
+        }
+        if (state.hardTimeoutTask != null) {
+            state.hardTimeoutTask.cancel();
+            state.hardTimeoutTask = null;
+        }
+        state.prepEndsAt = 0L;
     }
 
     public BattleSession getSessionByPlayer(UUID playerUUID) {
@@ -139,6 +202,10 @@ public class BattleManager {
             state.stats.recordMobKill();
         }
         if (state.aliveLivingMobs.isEmpty()) {
+            if (state.hardTimeoutTask != null) {
+                state.hardTimeoutTask.cancel();
+                state.hardTimeoutTask = null;
+            }
             state.stats.recordWaveSurvived();
             checkAdvance(session, state);
         }
@@ -154,7 +221,7 @@ public class BattleManager {
             checkSessionEnd(session);
         } else {
             Notifications.wavePassed(state.team, state.currentWaveNumber);
-            startNextWave(session, state);
+            scheduleWavePause(session, state);
         }
     }
 
@@ -179,6 +246,7 @@ public class BattleManager {
                     if (!state.stats.isFinished()) {
                         state.stats.markFinished(session.elapsedMs());
                     }
+                    cancelTasks(state);
                     broadcastTeam(state.team, "§cAlle Spieler tot — Battle für euer Team beendet.");
                     checkSessionEnd(session);
                 }
@@ -285,6 +353,8 @@ public class BattleManager {
         List<BattleSession> sessions = matchSessions.remove(match.getId());
         if (sessions == null) return;
         for (BattleSession s : sessions) {
+            cancelTasks(s.getStateA());
+            cancelTasks(s.getStateB());
             for (UUID mob : s.getStateA().aliveLivingMobs) sessionByMobUUID.remove(mob);
             for (UUID mob : s.getStateB().aliveLivingMobs) sessionByMobUUID.remove(mob);
         }
