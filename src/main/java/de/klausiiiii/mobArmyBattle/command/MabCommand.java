@@ -28,7 +28,7 @@ import java.util.UUID;
 public class MabCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("create", "join", "leave", "start", "pool", "endfarm", "tournament", "stats", "leaderboard", "spectate", "reload");
+            List.of("create", "join", "leave", "start", "pool", "endfarm", "tournament", "stats", "leaderboard", "spectate", "kick", "forcecancel", "reload");
     private static final List<String> TOURNAMENT_SUBS =
             List.of("create", "join", "leave", "start", "list");
 
@@ -72,6 +72,8 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 case "stats" -> handleStats(player, args);
                 case "leaderboard", "top" -> handleLeaderboard(player);
                 case "spectate" -> handleSpectate(player, args);
+                case "kick" -> handleKick(player, args);
+                case "forcecancel" -> handleForceCancel(player, args);
                 case "reload" -> handleReload(player);
                 default -> sendUsage(player);
             }
@@ -462,6 +464,61 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         spectatorManager.startSpectate(player, target.getUniqueId());
     }
 
+    private void handleKick(Player player, String[] args) {
+        Match match = matchManager.getMatchOf(player.getUniqueId());
+        if (match == null) {
+            player.sendMessage("§cDu bist in keinem Match.");
+            return;
+        }
+        Team team = match.findTeamOf(player.getUniqueId());
+        if (team == null || !player.getUniqueId().equals(team.getCaptainId())) {
+            player.sendMessage("§cNur der Captain kann kicken.");
+            return;
+        }
+        if (args.length < 2) {
+            player.sendMessage("§7Usage: /mab kick <player>");
+            return;
+        }
+        String targetName = args[1];
+        Player target = Bukkit.getPlayerExact(targetName);
+        if (target == null) {
+            player.sendMessage("§cSpieler '" + targetName + "' nicht online.");
+            return;
+        }
+        if (target.getUniqueId().equals(player.getUniqueId())) {
+            player.sendMessage("§cDu kannst dich nicht selbst kicken — nutze /mab leave.");
+            return;
+        }
+        if (!team.hasMember(target.getUniqueId())) {
+            player.sendMessage("§cSpieler ist nicht in deinem Team.");
+            return;
+        }
+        matchManager.leaveMatch(target.getUniqueId());
+        target.sendMessage("§eDu wurdest aus dem Team gekickt.");
+        player.sendMessage("§a" + target.getName() + " wurde gekickt.");
+    }
+
+    private void handleForceCancel(Player player, String[] args) {
+        if (!player.hasPermission("mobarmybattle.admin")) {
+            player.sendMessage("§cKeine Berechtigung.");
+            return;
+        }
+        if (args.length < 2) {
+            player.sendMessage("§7Usage: /mab forcecancel <matchId>");
+            return;
+        }
+        String matchId = args[1];
+        Match match = matchManager.getMatchById(matchId);
+        if (match == null) {
+            player.sendMessage("§cKein Match mit ID '" + matchId + "'.");
+            return;
+        }
+        matchManager.forceCancelMatch(match,
+                plugin.getBattleManager(),
+                plugin.getSpectatorManager());
+        player.sendMessage("§aMatch " + matchId + " wurde abgebrochen.");
+    }
+
     private void handleReload(Player player) {
         if (!player.hasPermission("mobarmybattle.reload")) {
             player.sendMessage(Component.text("Du hast keine Berechtigung für diesen Befehl.", NamedTextColor.RED));
@@ -509,6 +566,10 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/mab stats [player] — Lifetime-Stats", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leaderboard — Top 10", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab spectate [captain] — Battle zuschauen", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab kick <player> — Captain kickt Team-Mitglied", NamedTextColor.GRAY));
+        if (player.hasPermission("mobarmybattle.admin")) {
+            player.sendMessage(Component.text("/mab forcecancel <matchId> — Admin: Match abbrechen", NamedTextColor.GRAY));
+        }
         if (player.hasPermission("mobarmybattle.reload")) {
             player.sendMessage(Component.text("/mab reload — Konfiguration neu laden", NamedTextColor.GRAY));
         }
@@ -525,6 +586,9 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             List<String> visible = new ArrayList<>(SUBCOMMANDS);
             if (!sender.hasPermission("mobarmybattle.reload")) {
                 visible.remove("reload");
+            }
+            if (!sender.hasPermission("mobarmybattle.admin")) {
+                visible.remove("forcecancel");
             }
             return filterByPrefix(visible, args[0]);
         }
@@ -562,6 +626,26 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && args[0].equalsIgnoreCase("spectate") && sender instanceof Player p) {
             if (spectatorManager == null) return Collections.emptyList();
             return filterByPrefix(spectatorManager.listAvailableTargets(p.getUniqueId()), args[1]);
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("kick") && sender instanceof Player p) {
+            Match match = matchManager.getMatchOf(p.getUniqueId());
+            if (match == null) return Collections.emptyList();
+            Team team = match.findTeamOf(p.getUniqueId());
+            if (team == null || !p.getUniqueId().equals(team.getCaptainId())) return Collections.emptyList();
+            List<String> names = new ArrayList<>();
+            for (UUID id : team.getMemberIds()) {
+                if (id.equals(p.getUniqueId())) continue;
+                Player m = Bukkit.getPlayer(id);
+                if (m != null) names.add(m.getName());
+            }
+            return filterByPrefix(names, args[1]);
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("forcecancel") && sender.hasPermission("mobarmybattle.admin")) {
+            List<String> ids = new ArrayList<>();
+            for (Match m : matchManager.getActiveMatches()) ids.add(m.getId());
+            return filterByPrefix(ids, args[1]);
         }
 
         return Collections.emptyList();
