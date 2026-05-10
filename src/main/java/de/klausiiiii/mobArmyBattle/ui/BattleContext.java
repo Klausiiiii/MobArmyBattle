@@ -7,5 +7,7 @@ public record BattleContext(
         int teamMembersAlive,
         int teamMembersTotal,
         int currentWaveNumber,
-        String pairCaptainName
+        String pairCaptainName,
+        boolean inPrepPhase,
+        int prepSecondsLeft
 ) {}

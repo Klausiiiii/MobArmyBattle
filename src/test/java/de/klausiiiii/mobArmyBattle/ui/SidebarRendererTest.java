@@ -115,7 +115,7 @@ class SidebarRendererTest {
     void rendersBattleLayoutWithLiveData() {
         Match match = battleMatch();
         Team t = match.getTeams().get(0);
-        BattleContext ctx = new BattleContext(8, 20, 12, 3, 4, 1, "FooCaptain");
+        BattleContext ctx = new BattleContext(8, 20, 12, 3, 4, 1, "FooCaptain", false, 0);
 
         List<String> lines = SidebarRenderer.render(match, t, ctx, match.getPhaseStartedAt());
 
@@ -130,7 +130,7 @@ class SidebarRendererTest {
     void rendersBattleAllMembersDownInRed() {
         Match match = battleMatch();
         Team t = match.getTeams().get(0);
-        BattleContext ctx = new BattleContext(0, 20, 5, 0, 4, 2, "FooCaptain");
+        BattleContext ctx = new BattleContext(0, 20, 5, 0, 4, 2, "FooCaptain", false, 0);
 
         List<String> lines = SidebarRenderer.render(match, t, ctx, match.getPhaseStartedAt());
 
@@ -146,5 +146,43 @@ class SidebarRendererTest {
         m.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.WaveBuildPhase());
         m.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.BattlePhase());
         return m;
+    }
+
+    @Test
+    void rendersBattlePrepLayout() {
+        Match match = battleMatch();
+        Team t = match.getTeams().get(0);
+        BattleContext ctx = new BattleContext(0, 0, 0, 4, 4, 1, "FooCaptain", true, 25);
+
+        List<String> lines = SidebarRenderer.render(match, t, ctx, match.getPhaseStartedAt());
+
+        assertTrue(lines.contains("§7Phase: §6Bauphase - W1"));
+        assertTrue(lines.contains("§7Spawn in: §f00:25"));
+        assertFalse(lines.stream().anyMatch(l -> l.contains("Mobs übrig")));
+        assertTrue(lines.contains("§7Pair gegen §fFooCaptain"));
+    }
+
+    @Test
+    void rendersBattlePrepWithZeroSeconds() {
+        Match match = battleMatch();
+        Team t = match.getTeams().get(0);
+        BattleContext ctx = new BattleContext(0, 0, 0, 4, 4, 1, "FooCaptain", true, 0);
+
+        List<String> lines = SidebarRenderer.render(match, t, ctx, match.getPhaseStartedAt());
+
+        assertTrue(lines.contains("§7Spawn in: §f00:00"));
+    }
+
+    @Test
+    void rendersBattleAfterPrepWithLiveMobs() {
+        Match match = battleMatch();
+        Team t = match.getTeams().get(0);
+        BattleContext ctx = new BattleContext(8, 20, 12, 3, 4, 1, "FooCaptain", false, 0);
+
+        List<String> lines = SidebarRenderer.render(match, t, ctx, match.getPhaseStartedAt());
+
+        assertTrue(lines.contains("§7Phase: §cBattle - W1"));
+        assertTrue(lines.contains("§7Mobs übrig: §f8/20"));
+        assertFalse(lines.stream().anyMatch(l -> l.contains("Spawn in")));
     }
 }

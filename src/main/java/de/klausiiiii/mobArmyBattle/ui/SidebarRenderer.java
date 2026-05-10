@@ -82,10 +82,19 @@ public final class SidebarRenderer {
 
     private static List<String> renderBattle(Match match, Team viewer, BattleContext ctx, long currentTimeMs) {
         List<String> lines = new ArrayList<>();
-        addHeader(lines, match, "§7Phase: §cBattle - W" + (ctx == null ? 0 : ctx.currentWaveNumber()), currentTimeMs);
+        boolean prep = ctx != null && ctx.inPrepPhase();
+        String phaseLabel = prep
+                ? "§7Phase: §6Bauphase - W" + (ctx == null ? 0 : ctx.currentWaveNumber())
+                : "§7Phase: §cBattle - W" + (ctx == null ? 0 : ctx.currentWaveNumber());
+        addHeader(lines, match, phaseLabel, currentTimeMs);
         lines.add(SEP);
         if (ctx == null) {
             lines.add("§7(Daten lädt …)");
+        } else if (prep) {
+            int s = Math.max(0, ctx.prepSecondsLeft());
+            lines.add("§7Spawn in: §f" + String.format("%02d:%02d", s / 60, s % 60));
+            String teamColor = ctx.teamMembersAlive() == 0 ? "§c" : "§f";
+            lines.add("§7Team: " + teamColor + ctx.teamMembersAlive() + "/" + ctx.teamMembersTotal() + " lebt");
         } else {
             lines.add("§7Mobs übrig: §f" + ctx.mobsAlive() + "/" + ctx.mobsTotalThisWave());
             lines.add("§7Kills: §f" + ctx.mobKills());

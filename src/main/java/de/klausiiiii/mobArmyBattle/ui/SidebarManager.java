@@ -72,7 +72,9 @@ public class SidebarManager {
                 Math.max(0, alive),
                 team.getMemberIds().size(),
                 own.currentWaveNumber,
-                pairName);
+                pairName,
+                false,
+                0);
     }
 
     private void apply(Player player, List<String> lines) {
