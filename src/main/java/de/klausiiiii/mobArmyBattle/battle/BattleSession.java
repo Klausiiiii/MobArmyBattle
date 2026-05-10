@@ -20,6 +20,10 @@ public class BattleSession {
         public final BattleStats stats;
         public int currentWaveNumber = 0;
         public int currentWaveSpawnedTotal = 0;
+        public org.bukkit.scheduler.BukkitTask prepTask = null;
+        public org.bukkit.scheduler.BukkitTask hardTimeoutTask = null;
+        public long prepEndsAt = 0L;          // 0 means not in prep
+        public long currentWaveSpawnAt = 0L;  // when current wave spawned (for hard-timeout)
         public final Set<UUID> aliveLivingMobs = new HashSet<>();
         public final Set<UUID> downedPlayers = new HashSet<>();
 
