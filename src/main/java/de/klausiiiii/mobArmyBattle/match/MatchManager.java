@@ -177,6 +177,38 @@ public class MatchManager {
         return Collections.unmodifiableSet(captains);
     }
 
+    /**
+     * Forcefully cancels an active match, evicting all spectators, cleaning up
+     * battle state, removing all members from tracking, and removing the match
+     * from the index. Farm/arena worlds are not explicitly unloaded here — they
+     * become orphaned and are cleaned up by WorldManager.cleanupOrphanWorlds()
+     * on the next plugin start.
+     */
+    public void forceCancelMatch(Match match,
+                                 de.klausiiiii.mobArmyBattle.battle.BattleManager battleManager,
+                                 de.klausiiiii.mobArmyBattle.spectator.SpectatorManager spectatorManager) {
+        if (match == null) return;
+        // Evict spectators first (they may be in arena worlds that get cleaned up)
+        if (spectatorManager != null) {
+            spectatorManager.evictAll(match.getId());
+        }
+        // Cancel battle tasks + clear battle session state
+        if (battleManager != null) {
+            battleManager.cleanup(match);
+        }
+        // Force-remove all members (clears matchByPlayer per-uuid)
+        java.util.List<java.util.UUID> allMembers = new java.util.ArrayList<>();
+        for (Team t : match.getTeams()) {
+            allMembers.addAll(t.getMemberIds());
+        }
+        for (java.util.UUID id : allMembers) {
+            forceRemove(id);
+        }
+        // Match-level cleanup (forceRemove may have already removed it if last
+        // member was evicted, but remove is idempotent on HashMap)
+        matchesById.remove(match.getId());
+    }
+
     public void tickAll() {
         for (Match match : matchesById.values()) {
             match.tick();
