@@ -331,9 +331,15 @@ public class WaveBuildGui implements Listener {
             return;
         }
         wave.forfeit();
-        player.sendMessage(Component.text(
-                "Welle " + session.activeWave + " aufgegeben — Gegner gewinnt diese Welle.",
-                NamedTextColor.YELLOW));
+        Component broadcast = Component.text(
+                player.getName() + " hat Welle " + session.activeWave + " aufgegeben.",
+                NamedTextColor.YELLOW);
+        for (Team t : session.match.getTeams()) {
+            for (UUID memberId : t.getMemberIds()) {
+                Player p = Bukkit.getPlayer(memberId);
+                if (p != null) p.sendMessage(broadcast);
+            }
+        }
         afterFinalise(player, session);
     }
 

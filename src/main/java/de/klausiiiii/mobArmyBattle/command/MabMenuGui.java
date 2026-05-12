@@ -112,6 +112,7 @@ public class MabMenuGui implements Listener {
 
         Team team = match.findTeamOf(player.getUniqueId());
         boolean isCaptain = team != null && player.getUniqueId().equals(team.getCaptainId());
+        boolean isHost = player.getUniqueId().equals(match.getHostId());
         int teamNumber = team == null ? 0 : match.getTeams().indexOf(team) + 1;
         MatchPhaseType phase = match.getCurrentPhase().getType();
 
@@ -119,13 +120,13 @@ public class MabMenuGui implements Listener {
 
         switch (phase) {
             case LOBBY -> {
-                if (isCaptain) {
+                if (isHost) {
                     boolean canStart = match.canStart();
                     inv.setItem(MAIN_PRIMARY_SLOT, button(
                             canStart ? Material.LIME_WOOL : Material.GRAY_WOOL,
                             canStart ? "Match starten" : "Warten auf 2. Team",
                             canStart ? NamedTextColor.GREEN : NamedTextColor.GRAY,
-                            canStart ? "Captain-Aktion" : "Min. 2 Teams nötig"));
+                            canStart ? "Host-Aktion" : "Min. 2 Teams nötig"));
                 }
                 inv.setItem(MAIN_LEAVE_SLOT, button(Material.BARRIER,
                         "Match verlassen", NamedTextColor.RED, ""));
@@ -133,9 +134,9 @@ public class MabMenuGui implements Listener {
             case FARM -> {
                 inv.setItem(MAIN_POOL_SLOT, button(Material.CHEST,
                         "Team-Pool anzeigen", NamedTextColor.AQUA, ""));
-                if (isCaptain) {
+                if (isHost) {
                     inv.setItem(MAIN_ACTION_SLOT, button(Material.CLOCK,
-                            "Farm beenden", NamedTextColor.GOLD, "Captain-Aktion"));
+                            "Farm beenden", NamedTextColor.GOLD, "Host-Aktion"));
                 }
                 inv.setItem(MAIN_LEAVE_SLOT, button(Material.BARRIER,
                         "Match verlassen", NamedTextColor.RED, ""));
@@ -217,6 +218,7 @@ public class MabMenuGui implements Listener {
         }
         Team team = match.findTeamOf(player.getUniqueId());
         boolean isCaptain = team != null && player.getUniqueId().equals(team.getCaptainId());
+        boolean isHost = player.getUniqueId().equals(match.getHostId());
         MatchPhaseType phase = match.getCurrentPhase().getType();
 
         if (slot == MAIN_LEAVE_SLOT) {
@@ -231,13 +233,13 @@ public class MabMenuGui implements Listener {
             sendPool(player, team);
             return;
         }
-        if (phase == MatchPhaseType.LOBBY && slot == MAIN_PRIMARY_SLOT && isCaptain && match.canStart()) {
+        if (phase == MatchPhaseType.LOBBY && slot == MAIN_PRIMARY_SLOT && isHost && match.canStart()) {
             player.closeInventory();
             match.transitionTo(new FarmPhase(plugin));
             broadcast(match, "Match gestartet — Phase: FARM (Stub).", NamedTextColor.GOLD);
             return;
         }
-        if (phase == MatchPhaseType.FARM && slot == MAIN_ACTION_SLOT && isCaptain) {
+        if (phase == MatchPhaseType.FARM && slot == MAIN_ACTION_SLOT && isHost) {
             player.closeInventory();
             match.transitionTo(new WaveBuildPhase(plugin));
             broadcast(match, "Farm-Phase beendet — Captains bauen jetzt Wellen.", NamedTextColor.GOLD);

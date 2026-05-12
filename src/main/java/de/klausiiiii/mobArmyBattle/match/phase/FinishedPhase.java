@@ -7,6 +7,7 @@ import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
@@ -53,6 +54,7 @@ public class FinishedPhase implements MatchPhase {
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
                 wm.teleportToLobby(p);
+                p.setGameMode(GameMode.SURVIVAL);
             }
             plugin.getMatchManager().forceRemove(id);
         }

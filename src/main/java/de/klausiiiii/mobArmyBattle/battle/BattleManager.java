@@ -101,6 +101,13 @@ public class BattleManager {
 
     private void schedulePrep(BattleSession session, BattleSession.TeamState state, int waveNum) {
         state.currentWaveNumber = waveNum;
+        Wave opponentWave = waveNum == 1 ? state.opponent.getWave1() : state.opponent.getWave2();
+        if (opponentWave == null || opponentWave.isForfeited() || opponentWave.totalMobCount() == 0) {
+            broadcastTeam(state.team, "§eGegner-Welle " + waveNum + " ist leer/forfeit — übersprungen.");
+            state.stats.recordWaveSurvived();
+            checkAdvance(session, state);
+            return;
+        }
         int prepSec = plugin != null ? plugin.getMabConfig().phaseDurations().prepDurationSec() : 30;
         state.prepEndsAt = System.currentTimeMillis() + prepSec * 1000L;
         de.klausiiiii.mobArmyBattle.ui.Notifications.wavePrep(state.team, waveNum, prepSec);
@@ -224,6 +231,11 @@ public class BattleManager {
                 Notifications.wavePassed(state.team, state.currentWaveNumber);
                 state.stats.markFinished(session.elapsedMs());
                 broadcastTeam(state.team, "§aDu hast beide Wellen überlebt!");
+                for (UUID id : state.team.getMemberIds()) {
+                    if (state.downedPlayers.contains(id)) continue;
+                    Player p = Bukkit.getPlayer(id);
+                    if (p != null) p.setGameMode(GameMode.SPECTATOR);
+                }
             }
             checkSessionEnd(session);
         } else {

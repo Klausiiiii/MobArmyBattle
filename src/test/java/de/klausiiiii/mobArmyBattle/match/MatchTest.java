@@ -193,4 +193,54 @@ class MatchTest {
 
         assertTrue(match.canStart());
     }
+
+    @Test
+    void getHostIdReturnsFirstTeamCaptain() {
+        Match match = new Match("test-match-1");
+        UUID captain = UUID.randomUUID();
+        match.addTeam(new Team(captain));
+
+        assertEquals(captain, match.getHostId());
+    }
+
+    @Test
+    void getHostIdReturnsNullWhenNoTeams() {
+        Match match = new Match("test-match-1");
+
+        assertNull(match.getHostId());
+    }
+
+    @Test
+    void getHostIdReturnsNullWhenFirstTeamDisbanded() {
+        Match match = new Match("test-match-1");
+        Team team = new Team(UUID.randomUUID());
+        match.addTeam(team);
+        team.disband();
+
+        assertNull(match.getHostId());
+    }
+
+    @Test
+    void getHostIdFollowsCaptainChangeInFirstTeam() {
+        Match match = new Match("test-match-1", 0L, 2);
+        UUID original = UUID.randomUUID();
+        UUID newCaptain = UUID.randomUUID();
+        Team team = new Team(original, 2);
+        team.addMember(newCaptain);
+        match.addTeam(team);
+        team.promoteToCaptain(newCaptain);
+
+        assertEquals(newCaptain, match.getHostId());
+    }
+
+    @Test
+    void getHostIdIgnoresOtherTeamCaptains() {
+        Match match = new Match("test-match-1");
+        UUID host = UUID.randomUUID();
+        UUID otherCaptain = UUID.randomUUID();
+        match.addTeam(new Team(host));
+        match.addTeam(new Team(otherCaptain));
+
+        assertEquals(host, match.getHostId());
+    }
 }

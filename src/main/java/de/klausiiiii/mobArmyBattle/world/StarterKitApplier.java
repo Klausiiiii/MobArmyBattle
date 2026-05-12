@@ -18,10 +18,11 @@ public final class StarterKitApplier {
 
         Map<StarterKitConfig.Slot, Material> resolved = resolve(kit);
         PlayerInventory inv = player.getInventory();
+        inv.setHeldItemSlot(0);
         for (Map.Entry<StarterKitConfig.Slot, Material> e : resolved.entrySet()) {
             ItemStack stack = new ItemStack(e.getValue());
             switch (e.getKey()) {
-                case MAIN -> inv.setItemInMainHand(stack);
+                case MAIN -> inv.setItem(0, stack);
                 case OFF -> inv.setItemInOffHand(stack);
                 case HELM -> inv.setHelmet(stack);
                 case CHEST -> inv.setChestplate(stack);

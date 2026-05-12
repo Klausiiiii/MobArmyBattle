@@ -197,9 +197,8 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Match ist bereits gestartet.", NamedTextColor.RED));
             return;
         }
-        Team team = match.findTeamOf(playerId);
-        if (!team.getCaptainId().equals(playerId)) {
-            player.sendMessage(Component.text("Nur der Captain darf starten.", NamedTextColor.RED));
+        if (!playerId.equals(match.getHostId())) {
+            player.sendMessage(Component.text("Nur der Host (Match-Ersteller) darf starten.", NamedTextColor.RED));
             return;
         }
         if (!match.canStart()) {
@@ -235,9 +234,8 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Match ist nicht in Farm-Phase.", NamedTextColor.RED));
             return;
         }
-        Team team = match.findTeamOf(player.getUniqueId());
-        if (!team.getCaptainId().equals(player.getUniqueId())) {
-            player.sendMessage(Component.text("Nur ein Captain darf die Farm-Phase beenden.", NamedTextColor.RED));
+        if (!player.getUniqueId().equals(match.getHostId())) {
+            player.sendMessage(Component.text("Nur der Host (Match-Ersteller) darf die Farm-Phase beenden.", NamedTextColor.RED));
             return;
         }
         match.transitionTo(new WaveBuildPhase(plugin));
@@ -565,9 +563,9 @@ public class MabCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/mab create [max-team-size] — Match erstellen (Default 1, max-Spieler pro Team)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab join <captain> [1|2] — Match beitreten", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leave — Match verlassen", NamedTextColor.GRAY));
-        player.sendMessage(Component.text("/mab start — Match starten (nur Captain)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab start — Match starten (nur Host)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab pool — Team-Pool anzeigen", NamedTextColor.GRAY));
-        player.sendMessage(Component.text("/mab endfarm — Farm-Phase beenden (nur Captain)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/mab endfarm — Farm-Phase beenden (nur Host)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab tournament <create|join|leave|start|list>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab stats [player] — Lifetime-Stats", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/mab leaderboard — Top 10", NamedTextColor.GRAY));

@@ -77,6 +77,15 @@ public class Match {
         return null;
     }
 
+    /**
+     * The match host: captain of the first team (the player who created the match).
+     * Returns null if there is no first team or it has been disbanded.
+     */
+    public UUID getHostId() {
+        if (teams.isEmpty()) return null;
+        return teams.get(0).getCaptainId();
+    }
+
     public void setFarmWorldName(Team team, String worldName) {
         farmWorldNames.put(team, worldName);
     }
