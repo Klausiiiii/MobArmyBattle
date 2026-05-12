@@ -65,6 +65,7 @@ public class FinishedPhase implements MatchPhase {
                 wm.deleteWorld(w);
             }
         }
+        wm.deleteArenaWorldsOf(match.getId());
     }
 
     @Override

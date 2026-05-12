@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.logging.Logger;
 
@@ -144,6 +145,20 @@ public class WorldManager {
         }
         WorldCleanup.deleteRecursively(folder);
         log.info("Welt gelöscht: " + name);
+    }
+
+    /**
+     * Unloads and deletes every loaded arena world belonging to the given match
+     * ({@code mab_arena_<matchId>_*}). Safe to call even if no such worlds exist.
+     */
+    public void deleteArenaWorldsOf(String matchId) {
+        String prefix = ARENA_WORLD_PREFIX + matchId + "_";
+        // Copy the list: deleteWorld -> Bukkit.unloadWorld mutates Bukkit.getWorlds().
+        for (World w : new ArrayList<>(Bukkit.getWorlds())) {
+            if (w.getName().startsWith(prefix)) {
+                deleteWorld(w);
+            }
+        }
     }
 
     public void cleanupOrphanWorlds() {
