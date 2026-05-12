@@ -30,6 +30,7 @@ permissions:
       mobarmybattle.kick: true
       mobarmybattle.reload: true
       mobarmybattle.admin: true
+      mobarmybattle.lobby.bypass: true
   mobarmybattle.create:
     default: true
     description: Backwards-compat alias for create.match
@@ -59,3 +60,6 @@ permissions:
   mobarmybattle.admin:
     default: op
     description: Admin-Befehle
+  mobarmybattle.lobby.bypass:
+    default: op
+    description: Umgeht den Bauschutz in der Lobby

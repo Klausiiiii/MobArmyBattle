@@ -12,6 +12,7 @@ import de.klausiiiii.mobArmyBattle.listener.MobKillListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerConnectionListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerDeathFarmListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerRespawnListener;
+import de.klausiiiii.mobArmyBattle.listener.LobbyProtectionListener;
 import de.klausiiiii.mobArmyBattle.listener.WorldGroupInventoryListener;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
 import de.klausiiiii.mobArmyBattle.spectator.SpectatorManager;
@@ -115,6 +116,8 @@ public final class MobArmyBattle extends JavaPlugin {
                 new PlayerRespawnListener(this, matchManager), this);
         getServer().getPluginManager().registerEvents(
                 new WorldGroupInventoryListener(lobbyInventoryManager), this);
+        getServer().getPluginManager().registerEvents(
+                new LobbyProtectionListener(this), this);
 
         // 12. WaveBuildGui + MabMenuGui
         waveBuildGui = new WaveBuildGui(matchManager);

@@ -79,8 +79,8 @@ public class WorldManager {
         if (signBlock.getState() instanceof Sign sign) {
             sign.getSide(Side.FRONT).line(0, Component.text("MobArmy", NamedTextColor.GOLD));
             sign.getSide(Side.FRONT).line(1, Component.text("Battle", NamedTextColor.GOLD));
-            sign.getSide(Side.FRONT).line(2, Component.text("/mab create", NamedTextColor.GREEN));
-            sign.getSide(Side.FRONT).line(3, Component.text("zum Starten", NamedTextColor.GRAY));
+            sign.getSide(Side.FRONT).line(2, Component.text("» Rechtsklick «", NamedTextColor.GREEN));
+            sign.getSide(Side.FRONT).line(3, Component.text("öffnet das Menü", NamedTextColor.GRAY));
             sign.update();
         }
     }
