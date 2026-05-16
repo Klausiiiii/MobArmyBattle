@@ -3,6 +3,7 @@ package de.klausiiiii.mobArmyBattle.battle;
 import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.Team;
+import de.klausiiiii.mobArmyBattle.spectator.DeathSpectateGui;
 import de.klausiiiii.mobArmyBattle.spectator.SpectatorManager;
 import de.klausiiiii.mobArmyBattle.ui.Notifications;
 import de.klausiiiii.mobArmyBattle.wave.Wave;
@@ -12,7 +13,11 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Golem;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
+import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -29,17 +34,27 @@ public class BattleManager {
     private final WaveSpawner waveSpawner = new WaveSpawner();
     private final Map<String, List<BattleSession>> matchSessions = new HashMap<>();
     private final Map<UUID, BattleSession> sessionByMobUUID = new HashMap<>();
+    private final Map<UUID, Long> mobLastAttackMs = new HashMap<>();
     private final List<BiConsumer<Match, UUID>> battleEndListeners = new ArrayList<>();
     private final List<BiConsumer<Match, List<TeamOutcome>>> matchCompletedListeners = new ArrayList<>();
     private SpectatorManager spectatorManager;
+    private DeathSpectateGui deathSpectateGui;
 
     public void setSpectatorManager(SpectatorManager mgr) {
         this.spectatorManager = mgr;
     }
 
+    public void setDeathSpectateGui(DeathSpectateGui gui) {
+        this.deathSpectateGui = gui;
+    }
+
     public BattleManager(MobArmyBattle plugin) {
         this.plugin = plugin;
         this.arenaLoader = new ArenaLoader(plugin);
+        if (plugin != null) {
+            // Aggression-Ticker: setzt Targets, drückt passive Mobs zum Spieler + Manual-Damage.
+            Bukkit.getScheduler().runTaskTimer(plugin, this::tickAggression, 10L, 10L);
+        }
     }
 
     public void startBattlesFor(Match match) {
@@ -54,12 +69,13 @@ public class BattleManager {
         List<BattleSession> sessions = new ArrayList<>();
         WorldManager wm = plugin.getWorldManager();
 
+        de.klausiiiii.mobArmyBattle.config.MabConfig matchCfg = plugin != null ? plugin.effectiveConfig(match) : null;
         for (TeamPair pair : pairing.getPairs()) {
-            World arenaA = wm.createArenaWorld(match.getId(), idOf(match, pair.getTeamA()));
+            World arenaA = wm.createArenaWorld(match.getId(), idOf(match, pair.getTeamA()), matchCfg);
             arenaLoader.loadInto(arenaA);
             List<Location> spawnsA = ArenaSpawnScanner.scanAndConsume(arenaA, 50);
 
-            World arenaB = wm.createArenaWorld(match.getId(), idOf(match, pair.getTeamB()));
+            World arenaB = wm.createArenaWorld(match.getId(), idOf(match, pair.getTeamB()), matchCfg);
             arenaLoader.loadInto(arenaB);
             List<Location> spawnsB = ArenaSpawnScanner.scanAndConsume(arenaB, 50);
 
@@ -108,7 +124,7 @@ public class BattleManager {
             checkAdvance(session, state);
             return;
         }
-        int prepSec = plugin != null ? plugin.getMabConfig().phaseDurations().prepDurationSec() : 30;
+        int prepSec = plugin != null ? plugin.effectiveConfig(session.getMatch()).phaseDurations().prepDurationSec() : 30;
         state.prepEndsAt = System.currentTimeMillis() + prepSec * 1000L;
         de.klausiiiii.mobArmyBattle.ui.Notifications.wavePrep(state.team, waveNum, prepSec);
         broadcastTeam(state.team, "§eBauphase: Welle " + waveNum + " in " + prepSec + "s.");
@@ -141,7 +157,7 @@ public class BattleManager {
         state.currentWaveSpawnAt = System.currentTimeMillis();
         broadcastTeam(state.team, "§6Welle " + state.currentWaveNumber + " gestartet — " + mobs.size() + " Mobs.");
         de.klausiiiii.mobArmyBattle.ui.Notifications.waveSpawned(state.team, state.currentWaveNumber, mobs.size());
-        int hardTimeoutMin = plugin != null ? plugin.getMabConfig().phaseDurations().waveHardTimeoutMin() : 10;
+        int hardTimeoutMin = plugin != null ? plugin.effectiveConfig(session.getMatch()).phaseDurations().waveHardTimeoutMin() : 10;
         if (plugin != null) {
             state.hardTimeoutTask = Bukkit.getScheduler().runTaskLater(plugin,
                     () -> onHardTimeout(session, state),
@@ -166,7 +182,7 @@ public class BattleManager {
     }
 
     private void scheduleWavePause(BattleSession session, BattleSession.TeamState state) {
-        int pauseSec = plugin != null ? plugin.getMabConfig().phaseDurations().wavePauseSec() : 10;
+        int pauseSec = plugin != null ? plugin.effectiveConfig(session.getMatch()).phaseDurations().wavePauseSec() : 10;
         if (pauseSec <= 0 || plugin == null) {
             schedulePrep(session, state, state.currentWaveNumber + 1);
             return;
@@ -206,6 +222,7 @@ public class BattleManager {
 
     public void onMobKilled(UUID mobUUID, UUID killerUUID) {
         BattleSession session = sessionByMobUUID.remove(mobUUID);
+        mobLastAttackMs.remove(mobUUID);
         if (session == null) return;
         BattleSession.TeamState state = null;
         if (session.getStateA().aliveLivingMobs.contains(mobUUID)) state = session.getStateA();
@@ -253,6 +270,12 @@ public class BattleManager {
                 Player p = Bukkit.getPlayer(playerUUID);
                 if (p != null) {
                     p.setGameMode(GameMode.SPECTATOR);
+                    String matchId = session.getMatch().getId();
+                    if (plugin != null && deathSpectateGui != null) {
+                        List<UUID> captains = findActiveCaptainsForSpectate(matchId, playerUUID);
+                        Bukkit.getScheduler().runTask(plugin,
+                                () -> deathSpectateGui.open(p, captains, true));
+                    }
                 }
                 boolean allDown = true;
                 for (UUID id : state.team.getMemberIds()) {
@@ -374,11 +397,111 @@ public class BattleManager {
         for (BattleSession s : sessions) {
             cancelTasks(s.getStateA());
             cancelTasks(s.getStateB());
-            for (UUID mob : s.getStateA().aliveLivingMobs) sessionByMobUUID.remove(mob);
-            for (UUID mob : s.getStateB().aliveLivingMobs) sessionByMobUUID.remove(mob);
+            cleanupMobs(s.getStateA().aliveLivingMobs);
+            cleanupMobs(s.getStateB().aliveLivingMobs);
         }
         if (spectatorManager != null) {
             spectatorManager.evictAll(match.getId());
         }
+    }
+
+    private void cleanupMobs(java.util.Set<UUID> mobIds) {
+        for (UUID mob : mobIds) {
+            sessionByMobUUID.remove(mob);
+            mobLastAttackMs.remove(mob);
+            Entity e = Bukkit.getEntity(mob);
+            if (e != null) e.remove();
+        }
+        mobIds.clear();
+    }
+
+    /**
+     * Captains der noch laufenden Teams im Match (Stats nicht finished),
+     * exklusive Teams die {@code excludeViewer} enthalten. Wird von der
+     * DeathSpectateGui genutzt, um die Auswahl zu füllen.
+     */
+    public List<UUID> findActiveCaptainsForSpectate(String matchId, UUID excludeViewer) {
+        List<UUID> captains = new ArrayList<>();
+        List<BattleSession> sessions = matchSessions.get(matchId);
+        if (sessions == null) return captains;
+        for (BattleSession s : sessions) {
+            for (BattleSession.TeamState st : new BattleSession.TeamState[]{s.getStateA(), s.getStateB()}) {
+                if (st.team.hasMember(excludeViewer)) continue;
+                if (st.stats.isFinished()) continue;
+                UUID cap = st.team.getCaptainId();
+                if (cap != null) captains.add(cap);
+            }
+        }
+        return captains;
+    }
+
+    private void tickAggression() {
+        if (matchSessions.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        for (List<BattleSession> sessions : matchSessions.values()) {
+            for (BattleSession session : sessions) {
+                tickStateAggression(session.getStateA(), now);
+                tickStateAggression(session.getStateB(), now);
+            }
+        }
+    }
+
+    private void tickStateAggression(BattleSession.TeamState state, long now) {
+        if (state.aliveLivingMobs.isEmpty()) return;
+        World arena = state.arena;
+        if (arena == null) return;
+        List<Player> targets = new ArrayList<>();
+        for (UUID memberId : state.team.getMemberIds()) {
+            if (state.downedPlayers.contains(memberId)) continue;
+            Player p = Bukkit.getPlayer(memberId);
+            if (p == null) continue;
+            if (!p.getWorld().equals(arena)) continue;
+            GameMode gm = p.getGameMode();
+            if (gm == GameMode.SPECTATOR || gm == GameMode.CREATIVE) continue;
+            targets.add(p);
+        }
+        if (targets.isEmpty()) return;
+
+        for (UUID mobUUID : new ArrayList<>(state.aliveLivingMobs)) {
+            Entity ent = Bukkit.getEntity(mobUUID);
+            if (!(ent instanceof Mob mob)) continue;
+            if (mob.isDead() || !mob.isValid()) continue;
+
+            Player nearest = nearestPlayer(mob.getLocation(), targets);
+            if (nearest == null) continue;
+            if (mob.getTarget() == null || !nearest.equals(mob.getTarget())) {
+                mob.setTarget(nearest);
+            }
+            // Monster + Golems greifen natürlich an — passive Mobs müssen wir manuell pushen.
+            if (mob instanceof Monster) continue;
+            if (mob instanceof Golem) continue;
+            try {
+                mob.getPathfinder().moveTo(nearest, 1.2);
+            } catch (Throwable ignore) {
+                // Pathfinder kann je nach Mob fehlen — ignorieren, Damage greift trotzdem.
+            }
+            double dist = mob.getLocation().distanceSquared(nearest.getLocation());
+            if (dist <= 4.0) { // 2 Block-Radius (squared)
+                Long last = mobLastAttackMs.get(mobUUID);
+                if (last == null || (now - last) >= 1000L) {
+                    nearest.damage(3.0, mob);
+                    mobLastAttackMs.put(mobUUID, now);
+                }
+            }
+        }
+    }
+
+    private static Player nearestPlayer(Location loc, List<Player> players) {
+        Player best = null;
+        double bestSq = Double.MAX_VALUE;
+        for (Player p : players) {
+            if (!p.getWorld().equals(loc.getWorld())) continue;
+            double sq = p.getLocation().distanceSquared(loc);
+            if (sq < bestSq) {
+                bestSq = sq;
+                best = p;
+            }
+        }
+        return best;
     }
 }

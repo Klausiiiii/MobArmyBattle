@@ -63,7 +63,7 @@ public class MatchBossBarManager {
         BossBar bar = entry.bar;
         MatchPhaseType phase = match.getCurrentPhase().getType();
         long elapsedMs = System.currentTimeMillis() - match.getPhaseStartedAt();
-        int durationSec = durationFor(phase);
+        int durationSec = durationFor(match, phase);
 
         Component title;
         float progress;
@@ -117,7 +117,7 @@ public class MatchBossBarManager {
         entries.clear();
     }
 
-    private int durationFor(MatchPhaseType phase) {
+    private int durationFor(de.klausiiiii.mobArmyBattle.match.Match match, MatchPhaseType phase) {
         if (plugin == null) {
             return switch (phase) {
                 case FARM -> 60 * 60;
@@ -125,7 +125,7 @@ public class MatchBossBarManager {
                 default -> -1;
             };
         }
-        var phases = plugin.getMabConfig().phaseDurations();
+        var phases = plugin.effectiveConfig(match).phaseDurations();
         return switch (phase) {
             case FARM -> phases.farmDurationMin() * 60;
             case WAVE_BUILD -> phases.waveBuildDurationMin() * 60;

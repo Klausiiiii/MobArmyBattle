@@ -1,19 +1,23 @@
 package de.klausiiiii.mobArmyBattle.world;
 
+import de.klausiiiii.mobArmyBattle.config.MabConfig;
 import de.klausiiiii.mobArmyBattle.config.WorldBorderConfig;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Difficulty;
 import org.bukkit.GameRules;
 import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
-import org.bukkit.block.Block;
-import org.bukkit.block.Sign;
-import org.bukkit.block.sign.Side;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
+import org.bukkit.persistence.PersistentDataType;
 import de.klausiiiii.mobArmyBattle.MobArmyBattle;
 
 import java.io.File;
@@ -28,15 +32,25 @@ public class WorldManager {
     public static final String ARENA_WORLD_PREFIX = "mab_arena_";
 
     private static final int LOBBY_SPAWN_Y = 64;
-    private static final int LOBBY_PLATFORM_RADIUS = 2; // 5x5 platform
+    private static final double MENU_VILLAGER_X = 0.5;
+    private static final double MENU_VILLAGER_Y = 67.0;
+    private static final double MENU_VILLAGER_Z = 46.5;
+    private static final float MENU_VILLAGER_YAW = 180.0f;
+    public static final String MENU_VILLAGER_TAG_KEY = "mab_menu_villager";
 
     private final MobArmyBattle plugin;
     private final Logger log;
+    private final NamespacedKey menuVillagerKey;
     private World lobbyWorld;
 
     public WorldManager(MobArmyBattle plugin) {
         this.plugin = plugin;
         this.log = plugin.getLogger();
+        this.menuVillagerKey = new NamespacedKey(plugin, MENU_VILLAGER_TAG_KEY);
+    }
+
+    public NamespacedKey getMenuVillagerKey() {
+        return menuVillagerKey;
     }
 
     public World getOrCreateLobbyWorld() {
@@ -47,6 +61,8 @@ public class WorldManager {
         if (existing != null) {
             lobbyWorld = existing;
             applyAlwaysDay(existing);
+            applyLobbyMobBlock(existing);
+            ensureMenuVillager(existing);
             return existing;
         }
 
@@ -59,7 +75,8 @@ public class WorldManager {
         }
         lobbyWorld.setSpawnLocation(0, LOBBY_SPAWN_Y, 0);
         applyAlwaysDay(lobbyWorld);
-        buildLobbyPlatform(lobbyWorld);
+        applyLobbyMobBlock(lobbyWorld);
+        ensureMenuVillager(lobbyWorld);
         log.info("Lobby-Welt initialisiert: " + LOBBY_WORLD_NAME);
         return lobbyWorld;
     }
@@ -67,26 +84,101 @@ public class WorldManager {
     private void applyAlwaysDay(World world) {
         world.setTime(6000);
         world.setGameRule(GameRules.ADVANCE_TIME, false);
+        world.setGameRule(GameRules.ADVANCE_WEATHER, false);
+        world.setStorm(false);
+        world.setThundering(false);
+        world.setClearWeatherDuration(Integer.MAX_VALUE);
     }
 
-    private void buildLobbyPlatform(World world) {
-        for (int x = -LOBBY_PLATFORM_RADIUS; x <= LOBBY_PLATFORM_RADIUS; x++) {
-            for (int z = -LOBBY_PLATFORM_RADIUS; z <= LOBBY_PLATFORM_RADIUS; z++) {
-                world.getBlockAt(x, LOBBY_SPAWN_Y - 1, z).setType(Material.QUARTZ_BLOCK);
+    private void disableNaturalMobSpawning(World world) {
+        world.setGameRule(GameRules.SPAWN_MOBS, false);
+        world.setGameRule(GameRules.SPAWN_MONSTERS, false);
+        world.setGameRule(GameRules.SPAWNER_BLOCKS_WORK, false);
+        world.setSpawnFlags(false, false);
+    }
+
+    /**
+     * Game rules + PEACEFUL difficulty + spawn limits = 0. Entity removal happens
+     * separately in {@link #wipeAllMobs(World)} so chunks can be force-loaded first.
+     */
+    private void applyLobbyMobBlock(World world) {
+        disableNaturalMobSpawning(world);
+        world.setDifficulty(Difficulty.PEACEFUL);
+        world.setMonsterSpawnLimit(0);
+        world.setAnimalSpawnLimit(0);
+        world.setWaterAnimalSpawnLimit(0);
+        world.setWaterAmbientSpawnLimit(0);
+        world.setAmbientSpawnLimit(0);
+    }
+
+    private boolean isMenuVillager(Entity entity) {
+        return entity.getPersistentDataContainer().has(menuVillagerKey, PersistentDataType.BYTE);
+    }
+
+    /**
+     * Force-loads a small radius of chunks around the lobby spawn and the menu
+     * villager position so saved entities become visible, then removes every
+     * {@link Mob} in the world. Players, items, ArmorStands and other non-Mob
+     * entities are left untouched.
+     */
+    private void wipeAllMobs(World world) {
+        int radius = 4;
+        for (int cx = -radius; cx <= radius; cx++) {
+            for (int cz = -radius; cz <= radius; cz++) {
+                world.getChunkAt(cx, cz);
             }
         }
-        Block signBlock = world.getBlockAt(0, LOBBY_SPAWN_Y, LOBBY_PLATFORM_RADIUS);
-        signBlock.setType(Material.OAK_SIGN);
-        if (signBlock.getState() instanceof Sign sign) {
-            sign.getSide(Side.FRONT).line(0, Component.text("MobArmy", NamedTextColor.GOLD));
-            sign.getSide(Side.FRONT).line(1, Component.text("Battle", NamedTextColor.GOLD));
-            sign.getSide(Side.FRONT).line(2, Component.text("» Rechtsklick «", NamedTextColor.GREEN));
-            sign.getSide(Side.FRONT).line(3, Component.text("öffnet das Menü", NamedTextColor.GRAY));
-            sign.update();
+        int villagerChunkX = (int) Math.floor(MENU_VILLAGER_X) >> 4;
+        int villagerChunkZ = (int) Math.floor(MENU_VILLAGER_Z) >> 4;
+        for (int cx = villagerChunkX - 2; cx <= villagerChunkX + 2; cx++) {
+            for (int cz = villagerChunkZ - 2; cz <= villagerChunkZ + 2; cz++) {
+                world.getChunkAt(cx, cz);
+            }
         }
+        int removed = 0;
+        for (Entity entity : world.getEntities()) {
+            if (entity instanceof Mob) {
+                entity.remove();
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            log.info("Lobby-Cleanup: " + removed + " Mob(s) entfernt vor Villager-Spawn.");
+        }
+    }
+
+    /**
+     * Wipes all mobs in the lobby, then spawns a fresh tagged menu villager at the
+     * configured position. Called once on lobby load.
+     */
+    private void ensureMenuVillager(World world) {
+        wipeAllMobs(world);
+        Location spawnLoc = new Location(world, MENU_VILLAGER_X, MENU_VILLAGER_Y, MENU_VILLAGER_Z,
+                MENU_VILLAGER_YAW, 0.0f);
+        Villager villager = (Villager) world.spawnEntity(spawnLoc, EntityType.VILLAGER);
+        villager.getPersistentDataContainer().set(menuVillagerKey, PersistentDataType.BYTE, (byte) 1);
+        applyMenuVillagerProperties(villager);
+        log.info("Menü-Villager in der Lobby gespawnt: " + spawnLoc);
+    }
+
+    private void applyMenuVillagerProperties(Villager villager) {
+        villager.setAI(false);
+        villager.setInvulnerable(true);
+        villager.setSilent(true);
+        villager.setCollidable(false);
+        villager.setGravity(false);
+        villager.setPersistent(true);
+        villager.setRemoveWhenFarAway(false);
+        villager.setProfession(Villager.Profession.LIBRARIAN);
+        villager.customName(Component.text("» MobArmy Battle Menü «", NamedTextColor.GOLD));
+        villager.setCustomNameVisible(true);
     }
 
     public World createFarmWorld(String matchId, String teamId, long seed) {
+        return createFarmWorld(matchId, teamId, seed, plugin.getMabConfig());
+    }
+
+    public World createFarmWorld(String matchId, String teamId, long seed, MabConfig config) {
         String name = FARM_WORLD_PREFIX + matchId + "_" + teamId;
         WorldCreator creator = new WorldCreator(name)
                 .seed(seed)
@@ -95,13 +187,13 @@ public class WorldManager {
         if (world == null) {
             throw new IllegalStateException("Konnte Farm-Welt nicht erstellen: " + name);
         }
-        // Plan 9: WorldBorder + Mob-Spawn-Multiplier
-        WorldBorderConfig borderCfg = plugin.getMabConfig().farmBorder();
+        MabConfig cfg = config != null ? config : plugin.getMabConfig();
+        WorldBorderConfig borderCfg = cfg.farmBorder();
         if (borderCfg.enabled() && borderCfg.radius() > 0) {
             world.getWorldBorder().setCenter(world.getSpawnLocation());
             world.getWorldBorder().setSize(borderCfg.radius() * 2.0);
         }
-        double mult = plugin.getMabConfig().farmMobSpawnMultiplier();
+        double mult = cfg.farmMobSpawnMultiplier();
         int currentLimit = world.getMonsterSpawnLimit();
         int baseline = currentLimit > 0 ? currentLimit : 70;
         world.setMonsterSpawnLimit((int) Math.max(1, baseline * mult));
@@ -110,6 +202,10 @@ public class WorldManager {
     }
 
     public World createArenaWorld(String matchId, String teamId) {
+        return createArenaWorld(matchId, teamId, plugin.getMabConfig());
+    }
+
+    public World createArenaWorld(String matchId, String teamId, MabConfig config) {
         String name = ARENA_WORLD_PREFIX + matchId + "_" + teamId;
         WorldCreator creator = new WorldCreator(name)
                 .generator(new LobbyChunkGenerator())
@@ -118,9 +214,13 @@ public class WorldManager {
         if (world == null) {
             throw new IllegalStateException("Konnte Arena-Welt nicht erstellen: " + name);
         }
+        // Spawn explizit auf 0,0 setzen — die Arena-Struktur wird mittig darum platziert.
+        world.setSpawnLocation(0, 64, 0);
         applyAlwaysDay(world);
-        // Plan 9: WorldBorder
-        WorldBorderConfig arenaBorderCfg = plugin.getMabConfig().arenaBorder();
+        // Nur Wave-Spawns (SpawnReason.CUSTOM) — keine natürlichen Spawns in Arenen.
+        disableNaturalMobSpawning(world);
+        MabConfig cfg = config != null ? config : plugin.getMabConfig();
+        WorldBorderConfig arenaBorderCfg = cfg.arenaBorder();
         if (arenaBorderCfg.enabled() && arenaBorderCfg.radius() > 0) {
             world.getWorldBorder().setCenter(world.getSpawnLocation());
             world.getWorldBorder().setSize(arenaBorderCfg.radius() * 2.0);

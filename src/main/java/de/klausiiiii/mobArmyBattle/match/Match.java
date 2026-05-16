@@ -1,5 +1,6 @@
 package de.klausiiiii.mobArmyBattle.match;
 
+import de.klausiiiii.mobArmyBattle.config.MabConfig;
 import de.klausiiiii.mobArmyBattle.match.phase.LobbyPhase;
 
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ public class Match {
     private final Map<Team, String> farmWorldNames;
     private MatchPhase currentPhase;
     private long phaseStartedAt;
+    private MabConfig mabConfig;
 
     public Match(String id) {
         this(id, new Random().nextLong(), 1);
@@ -124,5 +126,20 @@ public class Match {
 
     public void tick() {
         currentPhase.tick(this);
+    }
+
+    /**
+     * Per-match config snapshot. Initialised by the production create path
+     * ({@link MatchManager#createMatch(UUID, int, MabConfig)}) with the plugin's
+     * global config; can be replaced by the host via the lobby config screen.
+     * May be {@code null} in unit tests that construct a Match without going
+     * through the create path — read sites must fall back to the plugin global.
+     */
+    public MabConfig getMabConfig() {
+        return mabConfig;
+    }
+
+    public void setMabConfig(MabConfig mabConfig) {
+        this.mabConfig = mabConfig;
     }
 }

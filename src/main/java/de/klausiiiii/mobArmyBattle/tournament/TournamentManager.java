@@ -133,7 +133,7 @@ public class TournamentManager {
         UUID captainA = pairing.getCaptainA();
         UUID captainB = pairing.getCaptainB();
         try {
-            Match m = matchManager.createMatch(captainA, 1);
+            Match m = matchManager.createMatch(captainA, 1, plugin.getMabConfig());
             matchManager.joinMatch(captainB, captainA);
             pairing.setMatchId(m.getId());
             byMatchId.put(m.getId(), t);

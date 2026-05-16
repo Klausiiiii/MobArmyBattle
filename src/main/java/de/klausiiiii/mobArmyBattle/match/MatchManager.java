@@ -1,5 +1,7 @@
 package de.klausiiiii.mobArmyBattle.match;
 
+import de.klausiiiii.mobArmyBattle.config.MabConfig;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,6 +23,10 @@ public class MatchManager {
     }
 
     public Match createMatch(UUID captainId, int maxTeamSize) {
+        return createMatch(captainId, maxTeamSize, null);
+    }
+
+    public Match createMatch(UUID captainId, int maxTeamSize, MabConfig mabConfig) {
         if (matchByPlayer.containsKey(captainId)) {
             throw new IllegalStateException("Spieler ist bereits in einem Match: " + captainId);
         }
@@ -30,6 +36,7 @@ public class MatchManager {
         String id = "match-" + matchIdCounter.getAndIncrement();
         long seed = new Random().nextLong();
         Match match = new Match(id, seed, maxTeamSize);
+        match.setMabConfig(mabConfig);
         match.addTeam(new Team(captainId, maxTeamSize));
         matchesById.put(id, match);
         matchByPlayer.put(captainId, match);
@@ -179,10 +186,8 @@ public class MatchManager {
 
     /**
      * Forcefully cancels an active match, evicting all spectators, cleaning up
-     * battle state, removing all members from tracking, and removing the match
-     * from the index. Farm/arena worlds are not explicitly unloaded here — they
-     * become orphaned and are cleaned up by WorldManager.cleanupOrphanWorlds()
-     * on the next plugin start.
+     * battle state, removing all members from tracking, deleting per-match
+     * farm/arena worlds, and removing the match from the index.
      */
     public void forceCancelMatch(Match match,
                                  de.klausiiiii.mobArmyBattle.battle.BattleManager battleManager,
@@ -211,6 +216,14 @@ public class MatchManager {
                 }
             }
             forceRemove(id);
+        }
+        // Welten direkt löschen — arenen IMMER nach battle aufräumen, keine orphans.
+        if (worldManager != null) {
+            for (String farmName : match.getAllFarmWorldNames().values()) {
+                org.bukkit.World w = org.bukkit.Bukkit.getWorld(farmName);
+                if (w != null) worldManager.deleteWorld(w);
+            }
+            worldManager.deleteArenaWorldsOf(match.getId());
         }
         // Match-level cleanup (forceRemove may have already removed it if last
         // member was evicted, but remove is idempotent on HashMap)

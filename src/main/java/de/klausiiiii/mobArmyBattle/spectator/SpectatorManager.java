@@ -95,19 +95,56 @@ public class SpectatorManager {
             return false;
         }
         PermissionResult.Allowed allowed = (PermissionResult.Allowed) res;
-        World arena = Bukkit.getWorld(allowed.arenaWorldName());
+        if (Bukkit.getWorld(allowed.arenaWorldName()) == null) {
+            viewer.sendMessage("§cArena-Welt nicht gefunden.");
+            return false;
+        }
+        if (!states.containsKey(viewer.getUniqueId())) {
+            returnLocations.put(viewer.getUniqueId(), viewer.getLocation());
+        }
+        return doSpectate(viewer, allowed.matchId(), allowed.arenaWorldName());
+    }
+
+    /**
+     * Death-Spectate: Spieler ist gerade in der Battle-Phase gestorben und wählt
+     * via GUI eine andere noch laufende Arena. Permission-Checks werden übersprungen
+     * (Caller hat bereits über die GUI gefiltert), und es wird KEINE returnLocation
+     * gespeichert — endSpectate fällt automatisch auf die Lobby zurück.
+     */
+    public boolean startDeathSpectate(Player viewer, UUID targetCaptainId) {
+        Match targetMatch = findMatchByCaptain(targetCaptainId);
+        if (targetMatch == null) {
+            viewer.sendMessage("§cCaptain nicht in einem laufenden Match.");
+            return false;
+        }
+        Team targetTeam = targetMatch.findTeamOf(targetCaptainId);
+        if (targetTeam == null) {
+            viewer.sendMessage("§cTeam nicht gefunden.");
+            return false;
+        }
+        String arenaWorldName = arenaWorldNameFor(targetMatch, targetTeam);
+        if (Bukkit.getWorld(arenaWorldName) == null) {
+            viewer.sendMessage("§cArena-Welt existiert nicht.");
+            return false;
+        }
+        return doSpectate(viewer, targetMatch.getId(), arenaWorldName);
+    }
+
+    private boolean doSpectate(Player viewer, String matchId, String arenaWorldName) {
+        World arena = Bukkit.getWorld(arenaWorldName);
         if (arena == null) {
             viewer.sendMessage("§cArena-Welt nicht gefunden.");
             return false;
         }
-
-        if (!states.containsKey(viewer.getUniqueId())) {
-            returnLocations.put(viewer.getUniqueId(), viewer.getLocation());
-        }
-        Location spawn = arena.getSpawnLocation();
-        viewer.teleport(spawn);
+        Location base = arena.getSpawnLocation();
+        int x = base.getBlockX();
+        int z = base.getBlockZ();
+        int y = arena.getHighestBlockYAt(x, z);
+        // 10 Blöcke über dem höchsten Block — Bird-Eye-View für Spectator.
+        Location target = new Location(arena, x + 0.5, y + 11.0, z + 0.5);
+        viewer.teleport(target);
         viewer.setGameMode(GameMode.SPECTATOR);
-        states.put(viewer.getUniqueId(), new SpectateState(allowed.matchId(), allowed.arenaWorldName()));
+        states.put(viewer.getUniqueId(), new SpectateState(matchId, arenaWorldName));
         viewer.sendMessage("§7Spectator-Mode aktiv. /mab leave zum Beenden.");
         return true;
     }
@@ -139,6 +176,16 @@ public class SpectatorManager {
 
     public List<String> listAvailableTargets(UUID viewerId) {
         List<String> out = new ArrayList<>();
+        for (UUID cap : findSpectatableCaptains(viewerId)) {
+            Player p = Bukkit.getPlayer(cap);
+            if (p != null) out.add(p.getName());
+        }
+        return out;
+    }
+
+    /** Wie {@link #listAvailableTargets} aber gibt UUIDs zurück (für die GUI). */
+    public List<UUID> findSpectatableCaptains(UUID viewerId) {
+        List<UUID> out = new ArrayList<>();
         for (Match m : matchManager.getActiveMatches()) {
             if (m.getCurrentPhase().getType() != MatchPhaseType.BATTLE) continue;
             for (Team t : m.getTeams()) {
@@ -146,8 +193,7 @@ public class SpectatorManager {
                 if (cap == null) continue;
                 PermissionResult res = checkPermission(viewerId, cap);
                 if (res instanceof PermissionResult.Allowed) {
-                    Player p = Bukkit.getPlayer(cap);
-                    if (p != null) out.add(p.getName());
+                    out.add(cap);
                 }
             }
         }

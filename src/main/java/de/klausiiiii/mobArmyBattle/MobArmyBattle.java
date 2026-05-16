@@ -14,7 +14,10 @@ import de.klausiiiii.mobArmyBattle.listener.PlayerDeathFarmListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerRespawnListener;
 import de.klausiiiii.mobArmyBattle.listener.LobbyProtectionListener;
 import de.klausiiiii.mobArmyBattle.listener.WorldGroupInventoryListener;
+import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
+import de.klausiiiii.mobArmyBattle.match.Team;
+import de.klausiiiii.mobArmyBattle.spectator.DeathSpectateGui;
 import de.klausiiiii.mobArmyBattle.spectator.SpectatorManager;
 import de.klausiiiii.mobArmyBattle.stats.StatsDatabase;
 import de.klausiiiii.mobArmyBattle.stats.StatsRecorder;
@@ -24,8 +27,19 @@ import de.klausiiiii.mobArmyBattle.ui.SidebarManager;
 import de.klausiiiii.mobArmyBattle.wave.WaveBuildGui;
 import de.klausiiiii.mobArmyBattle.world.LobbyInventoryManager;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 public final class MobArmyBattle extends JavaPlugin {
 
@@ -41,6 +55,7 @@ public final class MobArmyBattle extends JavaPlugin {
     private StatsDatabase statsDatabase;
     private StatsRepository statsRepository;
     private SpectatorManager spectatorManager;
+    private DeathSpectateGui deathSpectateGui;
     private SidebarManager sidebarManager;
     private ReconnectGraceManager reconnectGraceManager;
 
@@ -73,6 +88,11 @@ public final class MobArmyBattle extends JavaPlugin {
         // 6. SpectatorManager (depends on battleManager + tournamentManager)
         spectatorManager = new SpectatorManager(this, matchManager, battleManager, tournamentManager);
         battleManager.setSpectatorManager(spectatorManager);
+
+        // 6b. DeathSpectateGui (öffnet sich bei Tod in Battle-Phase + via /mab spectate)
+        deathSpectateGui = new DeathSpectateGui(this, battleManager, spectatorManager);
+        getServer().getPluginManager().registerEvents(deathSpectateGui, this);
+        battleManager.setDeathSpectateGui(deathSpectateGui);
 
         // 7. SidebarManager (depends on battleManager)
         sidebarManager = new SidebarManager(battleManager);
@@ -192,11 +212,28 @@ public final class MobArmyBattle extends JavaPlugin {
         return spectatorManager;
     }
 
+    public DeathSpectateGui getDeathSpectateGui() {
+        return deathSpectateGui;
+    }
+
     public SidebarManager getSidebarManager() {
         return sidebarManager;
     }
 
     public MabConfig getMabConfig() {
+        return mabConfig;
+    }
+
+    /**
+     * Returns the per-match config snapshot if the match has one, else the
+     * plugin-wide global config. Use this at read sites so per-match overrides
+     * take effect without breaking call paths (tests, tournament) that don't
+     * set a match config.
+     */
+    public MabConfig effectiveConfig(de.klausiiiii.mobArmyBattle.match.Match match) {
+        if (match != null && match.getMabConfig() != null) {
+            return match.getMabConfig();
+        }
         return mabConfig;
     }
 
@@ -207,5 +244,65 @@ public final class MobArmyBattle extends JavaPlugin {
     public void reloadMabConfig() {
         reloadConfig();
         mabConfig = ConfigLoader.load(this);
+    }
+
+    /**
+     * Broadcasts a clickable join-link for a freshly created match to every player
+     * currently in the lobby world (captain included). Called by both the {@code /mab
+     * create} command path and the villager-menu create path so neither bypasses it.
+     */
+    public void broadcastNewMatch(Player captain, int maxTeamSize) {
+        String joinCommand = "/mab join " + captain.getName();
+        Component joinLink = Component.text("[» Beitreten «]", NamedTextColor.GREEN, TextDecoration.BOLD)
+                .clickEvent(ClickEvent.runCommand(joinCommand))
+                .hoverEvent(HoverEvent.showText(
+                        Component.text("Klicke, um " + captain.getName() + "s Match beizutreten\n", NamedTextColor.GRAY)
+                                .append(Component.text(joinCommand, NamedTextColor.YELLOW))));
+        Component message = Component.text("» ", NamedTextColor.GOLD)
+                .append(Component.text(captain.getName(), NamedTextColor.AQUA))
+                .append(Component.text(" hat ein Match erstellt (max " + maxTeamSize + " pro Team). ",
+                        NamedTextColor.GRAY))
+                .append(joinLink);
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (p.equals(captain)) continue;
+            if (!WorldManager.LOBBY_WORLD_NAME.equals(p.getWorld().getName())) continue;
+            p.sendMessage(message);
+        }
+    }
+
+    /**
+     * Call BEFORE {@code matchManager.leaveMatch(leaver)}. If the leaver is the
+     * match host (= captain of team 1, i.e. the player who created the match),
+     * every other member of the match is evicted: removed from the match,
+     * teleported to the lobby and notified. No-op if the leaver isn't in a match
+     * or isn't the host.
+     */
+    public void cascadeIfHostLeaving(Player leaver) {
+        Match match = matchManager.getMatchOf(leaver.getUniqueId());
+        if (match == null) return;
+        UUID leaverId = leaver.getUniqueId();
+        if (!leaverId.equals(match.getHostId())) return;
+        List<UUID> others = new ArrayList<>();
+        for (Team team : match.getTeams()) {
+            for (UUID memberId : team.getMemberIds()) {
+                if (!memberId.equals(leaverId)) {
+                    others.add(memberId);
+                }
+            }
+        }
+        for (UUID otherId : others) {
+            try {
+                matchManager.leaveMatch(otherId);
+            } catch (RuntimeException ignored) {
+                // Already removed by an upstream cleanup — fine.
+            }
+            Player other = Bukkit.getPlayer(otherId);
+            if (other != null) {
+                worldManager.teleportToLobby(other);
+                other.sendMessage(Component.text(
+                        "Der Host (" + leaver.getName() + ") hat das Match verlassen. Du wurdest in die Lobby gebracht.",
+                        NamedTextColor.YELLOW));
+            }
+        }
     }
 }

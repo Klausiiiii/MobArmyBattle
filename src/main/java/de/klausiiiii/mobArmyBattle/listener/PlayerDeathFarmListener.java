@@ -38,7 +38,7 @@ public class PlayerDeathFarmListener implements Listener {
         if (team == null) return;
 
         DeathPenaltyConfig.Mode mode = plugin != null
-                ? plugin.getMabConfig().deathPenalty().mode()
+                ? plugin.effectiveConfig(match).deathPenalty().mode()
                 : DeathPenaltyConfig.Mode.SOFT;  // legacy default
         int penaltyPercent = mode.poolPercent();
         if (penaltyPercent > 0) {

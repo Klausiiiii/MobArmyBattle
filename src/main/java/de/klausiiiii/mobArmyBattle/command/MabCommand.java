@@ -105,13 +105,14 @@ public class MabCommand implements CommandExecutor, TabCompleter {
                 return;
             }
         }
-        Match match = matchManager.createMatch(player.getUniqueId(), maxTeamSize);
+        Match match = matchManager.createMatch(player.getUniqueId(), maxTeamSize, plugin.getMabConfig());
         player.sendMessage(Component.text(
                 "Match erstellt: " + match.getId() + " (max " + maxTeamSize + " pro Team). Du bist Captain Team 1.",
                 NamedTextColor.GREEN));
         player.sendMessage(Component.text(
                 "Andere joinen mit: /mab join " + player.getName() + " [team-nummer]",
                 NamedTextColor.GRAY));
+        plugin.broadcastNewMatch(player, maxTeamSize);
     }
 
     private void handleJoin(Player player, String[] args) {
@@ -177,6 +178,7 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Du bist in keinem Match.", NamedTextColor.RED));
             return;
         }
+        plugin.cascadeIfHostLeaving(player);
         matchManager.leaveMatch(player.getUniqueId());
         plugin.getWorldManager().teleportToLobby(player);
         player.sendMessage(Component.text("Match verlassen.", NamedTextColor.YELLOW));
@@ -444,13 +446,8 @@ public class MabCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            List<String> targets = spectatorManager.listAvailableTargets(player.getUniqueId());
-            if (targets.isEmpty()) {
-                player.sendMessage("§cKeine zuschaubaren Targets verfügbar.");
-            } else {
-                player.sendMessage("§7Verfügbare Targets: §f" + String.join(", ", targets));
-                player.sendMessage("§7Nutze §f/mab spectate <captain>");
-            }
+            List<UUID> captains = spectatorManager.findSpectatableCaptains(player.getUniqueId());
+            plugin.getDeathSpectateGui().open(player, captains, false);
             return;
         }
         String captainName = args[1];

@@ -6,7 +6,7 @@ import de.klausiiiii.mobArmyBattle.match.MatchPhase;
 import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
 import de.klausiiiii.mobArmyBattle.ui.Notifications;
-import de.klausiiiii.mobArmyBattle.world.StarterKitApplier;
+import de.klausiiiii.mobArmyBattle.world.FarmWorldLoader;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -41,18 +41,13 @@ public class FarmPhase implements MatchPhase {
         int teamIdx = 0;
         for (Team team : match.getTeams()) {
             String teamId = "team-" + (teamIdx++);
-            World farmWorld = wm.createFarmWorld(match.getId(), teamId, match.getSeed());
+            World farmWorld = wm.createFarmWorld(match.getId(), teamId, match.getSeed(),
+                    plugin.effectiveConfig(match));
             match.setFarmWorldName(team, farmWorld.getName());
             Location raw = farmWorld.getSpawnLocation();
             Location safe = WorldManager.safeSpawnAt(farmWorld, raw.getBlockX(), raw.getBlockZ());
             farmWorld.setSpawnLocation(safe);
-            for (UUID memberId : team.getMemberIds()) {
-                Player member = Bukkit.getPlayer(memberId);
-                if (member != null) {
-                    member.teleport(safe);
-                    StarterKitApplier.applyKit(member, plugin.getMabConfig().starterKit());
-                }
-            }
+            FarmWorldLoader.preloadAndTeleport(plugin, match, team, farmWorld, safe);
         }
         for (Team t : match.getTeams()) {
             Notifications.farmStart(t);
@@ -66,7 +61,7 @@ public class FarmPhase implements MatchPhase {
     @Override
     public void tick(Match match) {
         if (plugin == null) return;
-        var phases = plugin.getMabConfig().phaseDurations();
+        var phases = plugin.effectiveConfig(match).phaseDurations();
         if (!phases.autoFarmTransition()) return;
         long elapsedMs = System.currentTimeMillis() - match.getPhaseStartedAt();
         long durationMs = phases.farmDurationMin() * 60_000L;

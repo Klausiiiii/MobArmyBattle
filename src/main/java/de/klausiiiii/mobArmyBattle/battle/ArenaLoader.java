@@ -40,13 +40,21 @@ public class ArenaLoader {
             try {
                 org.bukkit.structure.Structure structure = Bukkit.getStructureManager().loadStructure(chosen);
                 if (structure != null) {
-                    Location origin = world.getSpawnLocation().clone();
+                    org.bukkit.util.BlockVector size = structure.getSize();
+                    int sizeX = size.getBlockX();
+                    int sizeZ = size.getBlockZ();
+                    // Struktur-Mitte auf world spawn (0,0) legen — Origin ist die Ecke,
+                    // also um halbe Größe nach -X/-Z verschieben.
+                    Location origin = world.getSpawnLocation().clone()
+                            .add(-(sizeX / 2.0), 0, -(sizeZ / 2.0));
+                    preloadChunksFor(world, origin.getBlockX(), origin.getBlockZ(), sizeX, sizeZ);
                     structure.place(origin, true,
                             org.bukkit.block.structure.StructureRotation.NONE,
                             org.bukkit.block.structure.Mirror.NONE,
                             -1, 1.0f,
                             new java.util.Random());
-                    log.info("Arena geladen aus " + chosen.getName());
+                    log.info("Arena geladen aus " + chosen.getName()
+                            + " (" + sizeX + "x" + sizeZ + " mittig auf 0,0)");
                     return;
                 }
             } catch (IOException | NoSuchMethodError | NoClassDefFoundError e) {
@@ -54,6 +62,18 @@ public class ArenaLoader {
             }
         }
         buildFallbackArena(world);
+    }
+
+    private void preloadChunksFor(World world, int minX, int minZ, int sizeX, int sizeZ) {
+        int minCx = minX >> 4;
+        int minCz = minZ >> 4;
+        int maxCx = (minX + sizeX) >> 4;
+        int maxCz = (minZ + sizeZ) >> 4;
+        for (int cx = minCx; cx <= maxCx; cx++) {
+            for (int cz = minCz; cz <= maxCz; cz++) {
+                world.getChunkAt(cx, cz).load();
+            }
+        }
     }
 
     private void buildFallbackArena(World world) {
@@ -80,6 +100,10 @@ public class ArenaLoader {
     }
 
     public Location getPlayerSpawn(World world) {
-        return world.getSpawnLocation().clone().add(0.5, 1, 0.5);
+        Location base = world.getSpawnLocation();
+        int x = base.getBlockX();
+        int z = base.getBlockZ();
+        int y = world.getHighestBlockYAt(x, z);
+        return new Location(world, x + 0.5, y + 1.0, z + 0.5);
     }
 }
