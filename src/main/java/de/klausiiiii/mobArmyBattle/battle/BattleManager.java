@@ -22,17 +22,34 @@ import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 
 public class BattleManager {
+
+    /**
+     * Per-match tournament state — tracks rounds so a single Match can run
+     * multi-round single-elimination until exactly one team survives.
+     * Eliminated teams (from wave-build) and per-round byes are kept here so
+     * we know who to route into spectator each round.
+     */
+    private static class MatchTournamentState {
+        int currentRound = 0;
+        final List<Team> currentRoundByes = new ArrayList<>();
+        final Map<Team, Integer> aggregatedKills = new HashMap<>();
+        Team finalWinner;
+    }
 
     private final MobArmyBattle plugin;
     private final ArenaLoader arenaLoader;
     private final WaveSpawner waveSpawner = new WaveSpawner();
     private final Map<String, List<BattleSession>> matchSessions = new HashMap<>();
+    private final Map<String, MatchTournamentState> tournamentByMatch = new HashMap<>();
     private final Map<UUID, BattleSession> sessionByMobUUID = new HashMap<>();
     private final Map<UUID, Long> mobLastAttackMs = new HashMap<>();
     private final List<BiConsumer<Match, UUID>> battleEndListeners = new ArrayList<>();
@@ -59,23 +76,46 @@ public class BattleManager {
 
     public void startBattlesFor(Match match) {
         List<Team> activeTeams = new ArrayList<>();
+        List<Team> eliminatedTeams = new ArrayList<>();
         for (Team t : match.getTeams()) {
-            if (!t.isDisbanded() && t.size() > 0) activeTeams.add(t);
+            if (t.isDisbanded() || t.size() == 0) continue;
+            if (t.isEliminated()) {
+                eliminatedTeams.add(t);
+            } else {
+                activeTeams.add(t);
+            }
         }
         if (activeTeams.size() < 2) {
             return;
         }
-        TeamPairing.Result pairing = TeamPairing.pair(activeTeams);
+        MatchTournamentState ts = new MatchTournamentState();
+        tournamentByMatch.put(match.getId(), ts);
+        startRound(match, activeTeams);
+    }
+
+    private void startRound(Match match, List<Team> teams) {
+        MatchTournamentState ts = tournamentByMatch.get(match.getId());
+        if (ts == null) return;
+        ts.currentRound++;
+
+        if (ts.currentRound > 1) {
+            broadcastMatch(match, "§6Runde " + ts.currentRound + " startet!");
+        }
+
+        TeamPairing.Result pairing = TeamPairing.pair(teams);
         List<BattleSession> sessions = new ArrayList<>();
         WorldManager wm = plugin.getWorldManager();
+        de.klausiiiii.mobArmyBattle.config.MabConfig matchCfg =
+                plugin != null ? plugin.effectiveConfig(match) : null;
 
-        de.klausiiiii.mobArmyBattle.config.MabConfig matchCfg = plugin != null ? plugin.effectiveConfig(match) : null;
         for (TeamPair pair : pairing.getPairs()) {
-            World arenaA = wm.createArenaWorld(match.getId(), idOf(match, pair.getTeamA()), matchCfg);
+            World arenaA = wm.createArenaWorld(match.getId(),
+                    roundedIdOf(match, pair.getTeamA(), ts.currentRound), matchCfg);
             arenaLoader.loadInto(arenaA);
             List<Location> spawnsA = ArenaSpawnScanner.scanAndConsume(arenaA, 50);
 
-            World arenaB = wm.createArenaWorld(match.getId(), idOf(match, pair.getTeamB()), matchCfg);
+            World arenaB = wm.createArenaWorld(match.getId(),
+                    roundedIdOf(match, pair.getTeamB(), ts.currentRound), matchCfg);
             arenaLoader.loadInto(arenaB);
             List<Location> spawnsB = ArenaSpawnScanner.scanAndConsume(arenaB, 50);
 
@@ -90,14 +130,52 @@ public class BattleManager {
         }
         matchSessions.put(match.getId(), sessions);
 
-        for (Team byeTeam : pairing.getByeTeams()) {
-            broadcastTeam(byeTeam, "§eDu hast einen Bye — automatischer Sieg.");
+        ts.currentRoundByes.clear();
+        ts.currentRoundByes.addAll(pairing.getByeTeams());
+
+        // Route every team that's not actively paired this round into a random
+        // session as a spectator: byes (auto-advance), eliminated teams (empty
+        // pool at end of farm), and losers from previous rounds.
+        Set<Team> paired = new HashSet<>();
+        for (TeamPair pair : pairing.getPairs()) {
+            paired.add(pair.getTeamA());
+            paired.add(pair.getTeamB());
+        }
+        for (Team t : match.getTeams()) {
+            if (t.isDisbanded() || t.size() == 0) continue;
+            if (paired.contains(t)) continue;
+            String label;
+            if (pairing.getByeTeams().contains(t)) {
+                label = "§eDu hast einen Bye in Runde " + ts.currentRound
+                        + " — automatisch in die nächste Runde.";
+            } else {
+                label = "§7Zuschauer in Runde " + ts.currentRound
+                        + " — du wirst zu einer zufälligen Arena teleportiert.";
+            }
+            broadcastTeam(t, label);
+            sendByeToRandomArena(t, sessions);
         }
     }
 
-    private String idOf(Match match, Team team) {
+    private String roundedIdOf(Match match, Team team, int round) {
         int idx = match.getTeams().indexOf(team);
-        return "team-" + idx + "-arena";
+        return "team-" + idx + "-r" + round + "-arena";
+    }
+
+    private void sendByeToRandomArena(Team byeTeam, List<BattleSession> sessions) {
+        if (spectatorManager == null || sessions.isEmpty()) return;
+        for (UUID memberId : byeTeam.getMemberIds()) {
+            Player p = Bukkit.getPlayer(memberId);
+            if (p == null) continue;
+            BattleSession randomSession = sessions.get(ThreadLocalRandom.current().nextInt(sessions.size()));
+            Team randomTeam = ThreadLocalRandom.current().nextBoolean()
+                    ? randomSession.getStateA().team
+                    : randomSession.getStateB().team;
+            UUID cap = randomTeam.getCaptainId();
+            if (cap != null) {
+                spectatorManager.startDeathSpectate(p, cap);
+            }
+        }
     }
 
     private void teleportTeam(Team team, World arena) {
@@ -120,7 +198,9 @@ public class BattleManager {
         Wave opponentWave = waveNum == 1 ? state.opponent.getWave1() : state.opponent.getWave2();
         if (opponentWave == null || opponentWave.isForfeited() || opponentWave.totalMobCount() == 0) {
             broadcastTeam(state.team, "§eGegner-Welle " + waveNum + " ist leer/forfeit — übersprungen.");
-            state.stats.recordWaveSurvived();
+            // Don't record this as "survived" — only real waves count toward the
+            // tiebreaker, otherwise forfeiting your own wave 2 hands the opponent a
+            // free wave-survival and skews the result.
             checkAdvance(session, state);
             return;
         }
@@ -144,7 +224,7 @@ public class BattleManager {
         Wave wave = state.currentWaveNumber == 1 ? state.opponent.getWave1() : state.opponent.getWave2();
         if (wave == null || wave.isForfeited() || wave.totalMobCount() == 0) {
             broadcastTeam(state.team, "§eGegner-Welle " + state.currentWaveNumber + " ist leer/forfeit — übersprungen.");
-            state.stats.recordWaveSurvived();
+            // No recordWaveSurvived here either — see schedulePrep comment.
             checkAdvance(session, state);
             return;
         }
@@ -269,12 +349,21 @@ public class BattleManager {
                 state.downedPlayers.add(playerUUID);
                 Player p = Bukkit.getPlayer(playerUUID);
                 if (p != null) {
+                    // Spectator-Mode während PlayerDeathEvent skipt den Respawn-Screen
+                    // (Paper-Verhalten) — Spieler bleibt in der eigenen Arena als Zuschauer
+                    // und kann Teamkollegen kämpfen sehen.
                     p.setGameMode(GameMode.SPECTATOR);
-                    String matchId = session.getMatch().getId();
-                    if (plugin != null && deathSpectateGui != null) {
-                        List<UUID> captains = findActiveCaptainsForSpectate(matchId, playerUUID);
-                        Bukkit.getScheduler().runTask(plugin,
-                                () -> deathSpectateGui.open(p, captains, true));
+                    // Belt-and-suspenders: re-apply next tick in case the in-death
+                    // transition didn't stick (Paper version drift / respawn screen race).
+                    if (plugin != null) {
+                        UUID id = playerUUID;
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            Player live = Bukkit.getPlayer(id);
+                            if (live != null && live.isOnline()
+                                    && live.getGameMode() != GameMode.SPECTATOR) {
+                                live.setGameMode(GameMode.SPECTATOR);
+                            }
+                        });
                     }
                 }
                 boolean allDown = true;
@@ -290,9 +379,34 @@ public class BattleManager {
                     }
                     cancelTasks(state);
                     broadcastTeam(state.team, "§cAlle Spieler tot — Battle für euer Team beendet.");
+                    // Team ist komplett raus — jetzt darf zum Pair-Partner gespectated werden.
+                    routeTeamToOpponentArena(state);
                     checkSessionEnd(session);
                 }
                 return;
+            }
+        }
+    }
+
+    private void routeTeamToOpponentArena(BattleSession.TeamState state) {
+        if (spectatorManager == null) return;
+        UUID opponentCap = state.opponent.getCaptainId();
+        if (opponentCap == null) return;
+        // Defer one tick: when this is called from inside PlayerDeathEvent the
+        // dying player is mid-respawn and a sync teleport may not stick.
+        for (UUID memberId : state.team.getMemberIds()) {
+            Player p = Bukkit.getPlayer(memberId);
+            if (p == null) continue;
+            UUID cap = opponentCap;
+            if (plugin != null) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player live = Bukkit.getPlayer(memberId);
+                    if (live != null && live.isOnline()) {
+                        spectatorManager.startDeathSpectate(live, cap);
+                    }
+                });
+            } else {
+                spectatorManager.startDeathSpectate(p, cap);
             }
         }
     }
@@ -315,30 +429,130 @@ public class BattleManager {
         }
         List<BattleSession> all = matchSessions.get(match.getId());
         if (all != null && all.stream().allMatch(BattleSession::isConcluded)) {
-            notifyMatchCompleted(match, all);
-            if (spectatorManager != null) spectatorManager.evictAll(match.getId());
-            match.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.FinishedPhase(plugin));
+            onRoundComplete(match, all);
         }
     }
 
-    private void notifyMatchCompleted(Match match, List<BattleSession> sessions) {
+    private void onRoundComplete(Match match, List<BattleSession> roundSessions) {
+        MatchTournamentState ts = tournamentByMatch.get(match.getId());
+        if (ts == null) {
+            // Should not happen — startBattlesFor always initialises tournament state.
+            scheduleFinalize(match);
+            return;
+        }
+        // Aggregate kills + collect winners.
+        List<Team> survivors = new ArrayList<>();
+        for (BattleSession s : roundSessions) {
+            BattleSession.TeamState sa = s.getStateA();
+            BattleSession.TeamState sb = s.getStateB();
+            ts.aggregatedKills.merge(sa.team, sa.stats.getMobKills(), Integer::sum);
+            ts.aggregatedKills.merge(sb.team, sb.stats.getMobKills(), Integer::sum);
+            BattleResult.Winner w = BattleResult.compare(sa.stats, sb.stats);
+            Team roundWinner = (w == BattleResult.Winner.B) ? sb.team : sa.team;
+            survivors.add(roundWinner);
+        }
+        survivors.addAll(ts.currentRoundByes);
+
+        // Losers of this round are no longer in the running.
+        for (Team t : new ArrayList<>(match.getTeams())) {
+            if (survivors.contains(t)) continue;
+            if (t.isDisbanded() || t.size() == 0) continue;
+            if (t.isEliminated()) continue;
+            t.eliminate();
+        }
+
+        if (survivors.size() <= 1) {
+            ts.finalWinner = survivors.isEmpty() ? null : survivors.get(0);
+            announceFinalWinner(match, ts);
+            notifyMatchCompletedFromTournament(match, ts);
+            scheduleFinalize(match);
+            return;
+        }
+
+        // More rounds to go — schedule next round after the post-battle view delay.
+        int delaySec = plugin != null
+                ? plugin.effectiveConfig(match).phaseDurations().postBattleViewSec()
+                : 0;
+        int delayTicks = delaySec * 20;
+        broadcastMatch(match, "§6Runde " + ts.currentRound + " abgeschlossen — Runde "
+                + (ts.currentRound + 1) + " in " + Math.max(delaySec, 1) + "s. Überlebende: " + survivors.size());
+        Runnable nextRound = () -> {
+            cleanupRoundResources(match);
+            startRound(match, survivors);
+        };
+        if (plugin != null && delayTicks > 0) {
+            Bukkit.getScheduler().runTaskLater(plugin, nextRound, delayTicks);
+        } else {
+            nextRound.run();
+        }
+    }
+
+    private void scheduleFinalize(Match match) {
+        int delaySec = plugin != null
+                ? plugin.effectiveConfig(match).phaseDurations().postBattleViewSec()
+                : 0;
+        int delayTicks = delaySec * 20;
+        if (plugin != null && delayTicks > 0) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> finishMatch(match), delayTicks);
+        } else {
+            finishMatch(match);
+        }
+    }
+
+    private void finishMatch(Match match) {
+        if (match.getCurrentPhase().getType() == de.klausiiiii.mobArmyBattle.match.MatchPhaseType.FINISHED) {
+            return;
+        }
+        if (spectatorManager != null) spectatorManager.evictAll(match.getId());
+        match.transitionTo(new de.klausiiiii.mobArmyBattle.match.phase.FinishedPhase(plugin));
+    }
+
+    private void cleanupRoundResources(Match match) {
+        List<BattleSession> sessions = matchSessions.remove(match.getId());
+        if (sessions == null) return;
+        Set<World> arenas = new HashSet<>();
+        for (BattleSession s : sessions) {
+            cancelTasks(s.getStateA());
+            cancelTasks(s.getStateB());
+            cleanupMobs(s.getStateA().aliveLivingMobs);
+            cleanupMobs(s.getStateB().aliveLivingMobs);
+            if (s.getStateA().arena != null) arenas.add(s.getStateA().arena);
+            if (s.getStateB().arena != null) arenas.add(s.getStateB().arena);
+        }
+        if (spectatorManager != null) spectatorManager.evictAll(match.getId());
+        for (World w : arenas) {
+            plugin.getWorldManager().deleteWorld(w);
+        }
+    }
+
+    private void announceFinalWinner(Match match, MatchTournamentState ts) {
+        Team winner = ts.finalWinner;
+        if (winner == null) {
+            broadcastMatch(match, "§eMatch endet ohne Sieger.");
+            return;
+        }
+        String name = teamName(winner);
+        broadcastMatch(match, "§6§lMATCH-SIEGER: " + name + " (Runde " + ts.currentRound + ")");
+        Notifications.victory(winner, name);
+        for (Team t : match.getTeams()) {
+            if (t == winner) continue;
+            if (t.isDisbanded() || t.size() == 0) continue;
+            Notifications.defeat(t, name);
+        }
+    }
+
+    private void notifyMatchCompletedFromTournament(Match match, MatchTournamentState ts) {
         if (matchCompletedListeners.isEmpty()) return;
         List<TeamOutcome> outcomes = new ArrayList<>();
-        for (BattleSession session : sessions) {
-            BattleSession.TeamState a = session.getStateA();
-            BattleSession.TeamState b = session.getStateB();
-            BattleResult.Winner winner = BattleResult.compare(a.stats, b.stats);
-            boolean aWon = winner != BattleResult.Winner.B;
+        for (Team t : match.getTeams()) {
+            if (t.getCaptainId() == null) continue;
+            boolean won = (t == ts.finalWinner);
+            int kills = ts.aggregatedKills.getOrDefault(t, 0);
             outcomes.add(new TeamOutcome(
-                    a.team.getCaptainId(),
-                    java.util.Set.copyOf(a.team.getMemberIds()),
-                    aWon,
-                    a.stats.getMobKills()));
-            outcomes.add(new TeamOutcome(
-                    b.team.getCaptainId(),
-                    java.util.Set.copyOf(b.team.getMemberIds()),
-                    !aWon,
-                    b.stats.getMobKills()));
+                    t.getCaptainId(),
+                    java.util.Set.copyOf(t.getMemberIds()),
+                    won,
+                    kills));
         }
         for (BiConsumer<Match, List<TeamOutcome>> listener : matchCompletedListeners) {
             listener.accept(match, outcomes);
@@ -391,7 +605,14 @@ public class BattleManager {
         }
     }
 
+    private void broadcastMatch(Match match, String message) {
+        for (Team t : match.getTeams()) {
+            broadcastTeam(t, message);
+        }
+    }
+
     public void cleanup(Match match) {
+        tournamentByMatch.remove(match.getId());
         List<BattleSession> sessions = matchSessions.remove(match.getId());
         if (sessions == null) return;
         for (BattleSession s : sessions) {

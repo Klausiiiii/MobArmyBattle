@@ -5,14 +5,18 @@ import de.klausiiiii.mobArmyBattle.config.ConfigLoader;
 import de.klausiiiii.mobArmyBattle.config.MabConfig;
 import de.klausiiiii.mobArmyBattle.config.ReconnectGraceManager;
 import de.klausiiiii.mobArmyBattle.bossbar.MatchBossBarManager;
+import de.klausiiiii.mobArmyBattle.command.ChatInputManager;
 import de.klausiiiii.mobArmyBattle.command.MabCommand;
 import de.klausiiiii.mobArmyBattle.command.MabMenuGui;
+import de.klausiiiii.mobArmyBattle.command.TeamSelectorGui;
 import de.klausiiiii.mobArmyBattle.listener.BattleEventListener;
 import de.klausiiiii.mobArmyBattle.listener.MobKillListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerConnectionListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerDeathFarmListener;
 import de.klausiiiii.mobArmyBattle.listener.PlayerRespawnListener;
 import de.klausiiiii.mobArmyBattle.listener.LobbyProtectionListener;
+import de.klausiiiii.mobArmyBattle.listener.PlayerFreezeManager;
+import de.klausiiiii.mobArmyBattle.listener.WaveBuildProtectionListener;
 import de.klausiiiii.mobArmyBattle.listener.WorldGroupInventoryListener;
 import de.klausiiiii.mobArmyBattle.match.Match;
 import de.klausiiiii.mobArmyBattle.match.MatchManager;
@@ -58,6 +62,9 @@ public final class MobArmyBattle extends JavaPlugin {
     private DeathSpectateGui deathSpectateGui;
     private SidebarManager sidebarManager;
     private ReconnectGraceManager reconnectGraceManager;
+    private PlayerFreezeManager playerFreezeManager;
+    private ChatInputManager chatInputManager;
+    private TeamSelectorGui teamSelectorGui;
 
     @Override
     public void onEnable() {
@@ -139,12 +146,26 @@ public final class MobArmyBattle extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new LobbyProtectionListener(this), this);
 
+        // 11b. PlayerFreezeManager (used by WaveBuildPhase to lock players in place)
+        playerFreezeManager = new PlayerFreezeManager();
+        getServer().getPluginManager().registerEvents(playerFreezeManager, this);
+
+        // 11c. WaveBuildProtectionListener — block/bucket/mob-damage gated in WAVE_BUILD
+        getServer().getPluginManager().registerEvents(
+                new WaveBuildProtectionListener(matchManager), this);
+
         // 12. WaveBuildGui + MabMenuGui
         waveBuildGui = new WaveBuildGui(matchManager);
         getServer().getPluginManager().registerEvents(waveBuildGui, this);
 
         mabMenuGui = new MabMenuGui(this, matchManager);
         getServer().getPluginManager().registerEvents(mabMenuGui, this);
+
+        // 12b. ChatInputManager + TeamSelectorGui (depends on matchManager)
+        chatInputManager = new ChatInputManager(this);
+        getServer().getPluginManager().registerEvents(chatInputManager, this);
+        teamSelectorGui = new TeamSelectorGui(this, matchManager, chatInputManager);
+        getServer().getPluginManager().registerEvents(teamSelectorGui, this);
 
         // 13. BossBarManager
         bossBarManager = new MatchBossBarManager(this);
@@ -239,6 +260,18 @@ public final class MobArmyBattle extends JavaPlugin {
 
     public ReconnectGraceManager getReconnectGraceManager() {
         return reconnectGraceManager;
+    }
+
+    public PlayerFreezeManager getPlayerFreezeManager() {
+        return playerFreezeManager;
+    }
+
+    public TeamSelectorGui getTeamSelectorGui() {
+        return teamSelectorGui;
+    }
+
+    public ChatInputManager getChatInputManager() {
+        return chatInputManager;
     }
 
     public void reloadMabConfig() {

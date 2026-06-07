@@ -68,7 +68,11 @@ public class SpectatorManager {
                 return new PermissionResult.Denied("Du bist in einem anderen Match.");
             }
             BattleSession session = battleManager.getSessionByPlayer(viewerId);
-            if (session == null) return new PermissionResult.Denied("Du bist nicht in einer Battle-Session.");
+            if (session == null) {
+                // Bye team / eliminated team — they're in the match but not in any pair.
+                // Allow them to spectate any active captain in the same match.
+                return new PermissionResult.Allowed(targetMatch.getId(), arenaWorld);
+            }
             BattleSession.TeamState own = session.getStateByPlayerUUID(viewerId);
             if (own == null || !own.stats.isFinished()) {
                 return new PermissionResult.Denied("Du musst erst beide Wellen abschließen.");

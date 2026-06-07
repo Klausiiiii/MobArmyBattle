@@ -2,10 +2,15 @@ package de.klausiiiii.mobArmyBattle.match;
 
 import de.klausiiiii.mobArmyBattle.pool.MobPool;
 import de.klausiiiii.mobArmyBattle.wave.Wave;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.Collections;
 
 public class Team {
     private UUID captainId;
@@ -14,6 +19,10 @@ public class Team {
     private final int maxSize;
     private final Wave wave1;
     private final Wave wave2;
+    private boolean eliminated = false;
+    private TeamVisibility visibility = TeamVisibility.PUBLIC;
+    private String passwordHash;
+    private final Set<UUID> invitedPlayers = new HashSet<>();
 
     public Team(UUID captainId) {
         this(captainId, 0);
@@ -140,5 +149,82 @@ public class Team {
     public void disband() {
         this.captainId = null;
         this.memberIds.clear();
+    }
+
+    /**
+     * Marks the team as out of competition (e.g. empty pool at end of farming).
+     * Members are intentionally kept so they can be routed into spectator mode in
+     * the battle phase and cleaned up by {@code FinishedPhase} like everyone else.
+     */
+    public void eliminate() {
+        this.eliminated = true;
+    }
+
+    public boolean isEliminated() {
+        return eliminated;
+    }
+
+    public TeamVisibility getVisibility() {
+        return visibility;
+    }
+
+    public void setVisibility(TeamVisibility visibility) {
+        if (visibility == null) {
+            throw new IllegalArgumentException("visibility darf nicht null sein");
+        }
+        this.visibility = visibility;
+    }
+
+    /**
+     * Stores a hashed copy of {@code rawPassword} and forces visibility to
+     * {@link TeamVisibility#PASSWORD}. Pass {@code null} to clear the password
+     * (visibility is left untouched in that case).
+     */
+    public void setPassword(String rawPassword) {
+        if (rawPassword == null) {
+            this.passwordHash = null;
+            return;
+        }
+        if (rawPassword.isBlank()) {
+            throw new IllegalArgumentException("Passwort darf nicht leer sein");
+        }
+        this.passwordHash = sha256(rawPassword);
+        this.visibility = TeamVisibility.PASSWORD;
+    }
+
+    public boolean verifyPassword(String rawPassword) {
+        if (passwordHash == null || rawPassword == null) return false;
+        return passwordHash.equals(sha256(rawPassword));
+    }
+
+    public boolean hasPassword() {
+        return passwordHash != null;
+    }
+
+    public void invite(UUID playerId) {
+        if (playerId == null) throw new IllegalArgumentException("playerId darf nicht null sein");
+        invitedPlayers.add(playerId);
+    }
+
+    public boolean isInvited(UUID playerId) {
+        return invitedPlayers.contains(playerId);
+    }
+
+    public void consumeInvite(UUID playerId) {
+        invitedPlayers.remove(playerId);
+    }
+
+    private static String sha256(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 nicht verfügbar", e);
+        }
     }
 }

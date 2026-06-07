@@ -174,6 +174,89 @@ class TeamTest {
     }
 
     @Test
+    void newTeamIsNotEliminated() {
+        Team team = new Team(UUID.randomUUID());
+        assertFalse(team.isEliminated());
+    }
+
+    @Test
+    void eliminatedTeamReportsEliminatedButKeepsMembersAndCaptain() {
+        UUID captain = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        Team team = new Team(captain);
+        team.addMember(member);
+
+        team.eliminate();
+
+        assertTrue(team.isEliminated());
+        assertEquals(captain, team.getCaptainId(), "eliminate must NOT clear the captain");
+        assertEquals(2, team.size(), "eliminate must NOT remove members (they need to be routed to spectator)");
+        assertFalse(team.isDisbanded());
+    }
+
+    @Test
+    void newTeamDefaultsToPublicVisibility() {
+        Team team = new Team(UUID.randomUUID());
+        assertEquals(TeamVisibility.PUBLIC, team.getVisibility());
+        assertFalse(team.hasPassword());
+    }
+
+    @Test
+    void setVisibilityRejectsNull() {
+        Team team = new Team(UUID.randomUUID());
+        assertThrows(IllegalArgumentException.class, () -> team.setVisibility(null));
+    }
+
+    @Test
+    void setPasswordStoresHashAndFlipsVisibility() {
+        Team team = new Team(UUID.randomUUID());
+        team.setPassword("hunter2");
+
+        assertEquals(TeamVisibility.PASSWORD, team.getVisibility());
+        assertTrue(team.hasPassword());
+        assertTrue(team.verifyPassword("hunter2"));
+        assertFalse(team.verifyPassword("wrong"));
+    }
+
+    @Test
+    void setPasswordRejectsBlank() {
+        Team team = new Team(UUID.randomUUID());
+        assertThrows(IllegalArgumentException.class, () -> team.setPassword(""));
+        assertThrows(IllegalArgumentException.class, () -> team.setPassword("   "));
+    }
+
+    @Test
+    void clearPasswordWithNullKeepsVisibility() {
+        Team team = new Team(UUID.randomUUID());
+        team.setPassword("pw");
+        team.setVisibility(TeamVisibility.PRIVATE);
+        team.setPassword(null);
+
+        assertFalse(team.hasPassword());
+        assertEquals(TeamVisibility.PRIVATE, team.getVisibility());
+        assertFalse(team.verifyPassword("pw"));
+    }
+
+    @Test
+    void inviteAndCheck() {
+        Team team = new Team(UUID.randomUUID());
+        UUID invitee = UUID.randomUUID();
+
+        assertFalse(team.isInvited(invitee));
+        team.invite(invitee);
+        assertTrue(team.isInvited(invitee));
+
+        team.consumeInvite(invitee);
+        assertFalse(team.isInvited(invitee));
+    }
+
+    @Test
+    void inviteRejectsNull() {
+        Team team = new Team(UUID.randomUUID());
+        assertThrows(IllegalArgumentException.class, () -> team.invite(null));
+    }
+
+    @Test
     void wavesFinalisedReturnsTrueOnlyWhenBothFinalised() {
         Team team = new Team(UUID.randomUUID());
         de.klausiiiii.mobArmyBattle.pool.MobEntry zombie =

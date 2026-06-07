@@ -16,6 +16,7 @@ import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerInteractAtEntityEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -29,6 +30,8 @@ import org.bukkit.persistence.PersistentDataType;
 public class LobbyProtectionListener implements Listener {
 
     public static final String BYPASS_PERMISSION = "mobarmybattle.lobby.bypass";
+
+    private static final int VOID_Y_THRESHOLD = 0;
 
     private final MobArmyBattle plugin;
 
@@ -114,7 +117,19 @@ public class LobbyProtectionListener implements Listener {
         if (!WorldManager.LOBBY_WORLD_NAME.equals(entity.getWorld().getName())) return;
         if (isMenuVillager(entity)) {
             event.setCancelled(true);
+            return;
         }
+        if (entity instanceof Player) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        if (!inLobby(player)) return;
+        if (player.getY() >= VOID_Y_THRESHOLD) return;
+        plugin.getWorldManager().teleportToLobby(player);
     }
 
     @EventHandler(ignoreCancelled = true)

@@ -348,4 +348,112 @@ class MatchManagerTest {
 
         assertDoesNotThrow(() -> manager.forceRemove(stranger));
     }
+
+    @Test
+    void joinMatchAsNewTeamCreatesPublicTeam() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(captain, 2);
+
+        Team newTeam = manager.joinMatchAsNewTeam(joiner, captain, TeamVisibility.PUBLIC, null);
+
+        Match match = manager.getMatchOf(joiner);
+        assertNotNull(match);
+        assertEquals(2, match.getTeams().size());
+        assertEquals(joiner, newTeam.getCaptainId());
+        assertEquals(TeamVisibility.PUBLIC, newTeam.getVisibility());
+    }
+
+    @Test
+    void joinMatchAsNewTeamWithPasswordHashesIt() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(captain, 2);
+
+        Team newTeam = manager.joinMatchAsNewTeam(joiner, captain, TeamVisibility.PASSWORD, "pw123");
+
+        assertEquals(TeamVisibility.PASSWORD, newTeam.getVisibility());
+        assertTrue(newTeam.hasPassword());
+        assertTrue(newTeam.verifyPassword("pw123"));
+    }
+
+    @Test
+    void joinMatchAsNewTeamRejectsPasswordWithoutValue() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(captain, 2);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> manager.joinMatchAsNewTeam(joiner, captain, TeamVisibility.PASSWORD, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> manager.joinMatchAsNewTeam(joiner, captain, TeamVisibility.PASSWORD, " "));
+    }
+
+    @Test
+    void joinExistingTeamPublicAlwaysWorks() {
+        MatchManager manager = new MatchManager();
+        UUID captain = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(captain, 2);
+
+        manager.joinExistingTeam(joiner, captain, 0, null);
+
+        assertEquals(2, manager.getMatchOf(captain).getTeams().get(0).size());
+    }
+
+    @Test
+    void joinExistingTeamPasswordRejectsWrongPw() {
+        MatchManager manager = new MatchManager();
+        UUID hostA = UUID.randomUUID();
+        UUID hostB = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(hostA, 2);
+        manager.joinMatchAsNewTeam(hostB, hostA, TeamVisibility.PASSWORD, "secret");
+
+        assertThrows(IllegalStateException.class,
+                () -> manager.joinExistingTeam(joiner, hostA, 1, "wrong"));
+        assertNull(manager.getMatchOf(joiner));
+
+        manager.joinExistingTeam(joiner, hostA, 1, "secret");
+        assertNotNull(manager.getMatchOf(joiner));
+    }
+
+    @Test
+    void joinExistingTeamInviteBypassesPassword() {
+        MatchManager manager = new MatchManager();
+        UUID hostA = UUID.randomUUID();
+        UUID hostB = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(hostA, 2);
+        manager.joinMatchAsNewTeam(hostB, hostA, TeamVisibility.PASSWORD, "secret");
+        manager.getMatchOf(hostA).getTeams().get(1).invite(joiner);
+
+        manager.joinExistingTeam(joiner, hostA, 1, null);
+
+        assertNotNull(manager.getMatchOf(joiner));
+        assertFalse(manager.getMatchOf(hostA).getTeams().get(1).isInvited(joiner));
+    }
+
+    @Test
+    void joinExistingTeamPrivateRequiresInvite() {
+        MatchManager manager = new MatchManager();
+        UUID hostA = UUID.randomUUID();
+        UUID hostB = UUID.randomUUID();
+        UUID joiner = UUID.randomUUID();
+        manager.createMatch(hostA, 2);
+        manager.joinMatchAsNewTeam(hostB, hostA, TeamVisibility.PRIVATE, null);
+
+        assertThrows(IllegalStateException.class,
+                () -> manager.joinExistingTeam(joiner, hostA, 1, null));
+
+        manager.getMatchOf(hostA).getTeams().get(1).invite(joiner);
+        manager.joinExistingTeam(joiner, hostA, 1, null);
+
+        assertNotNull(manager.getMatchOf(joiner));
+        // Invite is one-shot
+        assertFalse(manager.getMatchOf(hostA).getTeams().get(1).isInvited(joiner));
+    }
 }

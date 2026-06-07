@@ -6,6 +6,8 @@ phases:
   wave-pause-sec: 10
   wave-hard-timeout-min: 10
   auto-farm-transition: true
+  # Seconds the dying team spectates the end state before being teleported to lobby
+  post-battle-view-sec: 8
 
 starter-kit:
   type: iron_full

@@ -7,6 +7,7 @@ import de.klausiiiii.mobArmyBattle.match.MatchPhaseType;
 import de.klausiiiii.mobArmyBattle.match.Team;
 import de.klausiiiii.mobArmyBattle.world.WorldManager;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -31,6 +32,15 @@ public class PlayerRespawnListener implements Listener {
         String deathWorldName = player.getWorld().getName();
 
         if (deathWorldName.startsWith(WorldManager.ARENA_WORLD_PREFIX)) {
+            // Fallback: if the Paper death-→-spectator transition didn't trigger and
+            // the death screen showed anyway, re-apply spectator mode after respawn
+            // so the player stays in their arena as a downed teammate.
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline() && player.getGameMode() != GameMode.SPECTATOR
+                        && player.getWorld().getName().startsWith(WorldManager.ARENA_WORLD_PREFIX)) {
+                    player.setGameMode(GameMode.SPECTATOR);
+                }
+            });
             return;
         }
 

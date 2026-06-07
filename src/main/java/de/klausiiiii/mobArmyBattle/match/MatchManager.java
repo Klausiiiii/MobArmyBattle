@@ -89,6 +89,75 @@ public class MatchManager {
         matchByPlayer.put(playerId, match);
     }
 
+    /**
+     * Joiner creates a brand-new team (becomes its captain) at the end of the
+     * match's team list with the given visibility. Used by the team-selector
+     * UI when a player picks "create new team" instead of joining an existing
+     * one. {@code rawPassword} only matters if {@code visibility ==
+     * TeamVisibility#PASSWORD}; it is hashed and stored on the team.
+     */
+    public Team joinMatchAsNewTeam(UUID playerId, UUID captainId,
+                                    TeamVisibility visibility, String rawPassword) {
+        if (matchByPlayer.containsKey(playerId)) {
+            throw new IllegalStateException("Spieler ist bereits in einem Match: " + playerId);
+        }
+        Match match = matchByPlayer.get(captainId);
+        if (match == null) {
+            throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
+        }
+        if (visibility == null) {
+            throw new IllegalArgumentException("visibility darf nicht null sein");
+        }
+        Team newTeam = new Team(playerId, match.getMaxTeamSize());
+        if (visibility == TeamVisibility.PASSWORD) {
+            if (rawPassword == null || rawPassword.isBlank()) {
+                throw new IllegalArgumentException("Passwort fehlt für PASSWORD-Team");
+            }
+            newTeam.setPassword(rawPassword);
+        } else {
+            newTeam.setVisibility(visibility);
+        }
+        match.addTeam(newTeam);
+        matchByPlayer.put(playerId, match);
+        return newTeam;
+    }
+
+    /**
+     * Like {@link #joinMatch(UUID, UUID, int)} but enforces the target team's
+     * {@link TeamVisibility}. Throws if the visibility check fails — caller is
+     * responsible for collecting the password / having the invitation first.
+     */
+    public void joinExistingTeam(UUID playerId, UUID captainId, int teamIndex, String rawPassword) {
+        if (matchByPlayer.containsKey(playerId)) {
+            throw new IllegalStateException("Spieler ist bereits in einem Match: " + playerId);
+        }
+        Match match = matchByPlayer.get(captainId);
+        if (match == null) {
+            throw new IllegalArgumentException("Captain hat kein Match: " + captainId);
+        }
+        if (teamIndex < 0 || teamIndex >= match.getTeams().size()) {
+            throw new IllegalArgumentException("Ungültiger Team-Index: " + teamIndex);
+        }
+        Team target = match.getTeams().get(teamIndex);
+        // An invitation from the captain bypasses both password and private checks —
+        // captains shouldn't need to share the password just to add a known player.
+        if (target.isInvited(playerId)) {
+            target.consumeInvite(playerId);
+        } else {
+            switch (target.getVisibility()) {
+                case PUBLIC -> { /* always allowed */ }
+                case PASSWORD -> {
+                    if (!target.verifyPassword(rawPassword)) {
+                        throw new IllegalStateException("Falsches Passwort.");
+                    }
+                }
+                case PRIVATE -> throw new IllegalStateException(
+                        "Du brauchst eine Einladung vom Captain dieses Teams.");
+            }
+        }
+        joinAt(match, playerId, teamIndex);
+    }
+
     private int pickAutoBalanceTeam(Match match) {
         List<Team> teams = match.getTeams();
         int bestIdx = -1;

@@ -25,7 +25,7 @@ public record MabConfig(
 
     public static MabConfig defaults() {
         return new MabConfig(
-                new PhaseDurations(60, 5, 30, 10, 10, true),
+                new PhaseDurations(60, 5, 30, 10, 10, true, 8),
                 new StarterKitConfig(StarterKitConfig.Type.IRON_FULL, Map.of()),
                 new DeathPenaltyConfig(DeathPenaltyConfig.Mode.SOFT),
                 new WorldBorderConfig(true, 200),

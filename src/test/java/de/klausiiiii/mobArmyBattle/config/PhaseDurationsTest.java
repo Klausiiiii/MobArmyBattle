@@ -39,4 +39,28 @@ class PhaseDurationsTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new PhaseDurations(60, 5, 30, -1, 10, true));
     }
+
+    @Test
+    void sixArgConstructorDefaultsPostBattleViewSec() {
+        PhaseDurations p = new PhaseDurations(60, 5, 30, 10, 10, true);
+        assertEquals(8, p.postBattleViewSec());
+    }
+
+    @Test
+    void canSetPostBattleViewSec() {
+        PhaseDurations p = new PhaseDurations(60, 5, 30, 10, 10, true, 15);
+        assertEquals(15, p.postBattleViewSec());
+    }
+
+    @Test
+    void allowsZeroPostBattleViewSec() {
+        PhaseDurations p = new PhaseDurations(60, 5, 30, 10, 10, true, 0);
+        assertEquals(0, p.postBattleViewSec());
+    }
+
+    @Test
+    void rejectsNegativePostBattleViewSec() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new PhaseDurations(60, 5, 30, 10, 10, true, -1));
+    }
 }

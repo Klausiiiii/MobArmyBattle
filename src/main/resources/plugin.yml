@@ -23,7 +23,6 @@ permissions:
     default: op
     children:
       mobarmybattle.create.match: true
-      mobarmybattle.create.tournament: true
       mobarmybattle.join: true
       mobarmybattle.spectate: true
       mobarmybattle.stats: true
@@ -31,6 +30,7 @@ permissions:
       mobarmybattle.reload: true
       mobarmybattle.admin: true
       mobarmybattle.lobby.bypass: true
+      mobarmybattle.wavebuild.bypass: true
   mobarmybattle.create:
     default: true
     description: Backwards-compat alias for create.match
@@ -39,9 +39,6 @@ permissions:
   mobarmybattle.create.match:
     default: true
     description: Erlaubt /mab create
-  mobarmybattle.create.tournament:
-    default: op
-    description: Erlaubt /mab tournament create
   mobarmybattle.join:
     default: true
     description: Erlaubt /mab join, leave
@@ -63,3 +60,6 @@ permissions:
   mobarmybattle.lobby.bypass:
     default: op
     description: Umgeht den Bauschutz in der Lobby
+  mobarmybattle.wavebuild.bypass:
+    default: op
+    description: Umgeht den Bau-/Bucket-/Mob-Schutz während der Wave-Build-Phase

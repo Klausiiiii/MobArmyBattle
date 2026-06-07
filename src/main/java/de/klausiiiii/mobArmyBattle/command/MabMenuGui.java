@@ -68,6 +68,7 @@ public class MabMenuGui implements Listener {
     private static final int CFG_ARENA_BORDER_EN = 32;
     private static final int CFG_ARENA_BORDER_RADIUS = 34;
     private static final int CFG_MOB_MULTIPLIER = 40;
+    private static final int CFG_POST_BATTLE_VIEW = 42;
     private static final int CFG_BACK = 45;
     private static final int CFG_INFO = 49;
     private static final int CFG_SUBMIT = 53;
@@ -337,6 +338,18 @@ public class MabMenuGui implements Listener {
         }
         UUID captainId = session.joinCaptains.get(slot);
         if (captainId == null) return;
+        Match targetMatch = matchManager.getMatchOf(captainId);
+        if (targetMatch == null) {
+            player.sendMessage(Component.text("Captain ist in keinem Match mehr.", NamedTextColor.RED));
+            return;
+        }
+        // Multi-team matches: route through TeamSelectorGui so the joiner can pick
+        // an existing team or create their own (public/private/password).
+        if (targetMatch.getMaxTeamSize() > 1 && plugin.getTeamSelectorGui() != null) {
+            sessions.remove(player.getUniqueId());
+            plugin.getTeamSelectorGui().open(player, captainId);
+            return;
+        }
         try {
             matchManager.joinMatch(player.getUniqueId(), captainId);
             player.closeInventory();
@@ -423,6 +436,9 @@ public class MabMenuGui implements Listener {
         inv.setItem(CFG_MOB_MULTIPLIER, numericButton(Material.ZOMBIE_HEAD,
                 "Farm Mob-Spawn", String.format(java.util.Locale.ROOT, "%.1fx", c.farmMobSpawnMultiplier()),
                 "Klick: +0.1  Rechtsklick: -0.1  Shift: ±1.0"));
+        inv.setItem(CFG_POST_BATTLE_VIEW, numericButton(Material.SPYGLASS,
+                "Post-Battle Zuschau-Zeit", p.postBattleViewSec() + " s",
+                "Klick: +1  Rechtsklick: -1  Shift: ±5"));
 
         inv.setItem(CFG_BACK, button(Material.ARROW, "Zurück", NamedTextColor.GRAY,
                 session.configMode == ConfigMode.CREATE ? "Zurück zur Größenwahl" : "Zurück zum Hauptmenü"));
@@ -464,31 +480,37 @@ public class MabMenuGui implements Listener {
                 int v = clamp(p.farmDurationMin() + sign * (isShift ? 5 : 1), 1, 120);
                 session.pendingConfig = withPhaseDurations(c, new PhaseDurations(v,
                         p.waveBuildDurationMin(), p.prepDurationSec(), p.wavePauseSec(),
-                        p.waveHardTimeoutMin(), p.autoFarmTransition()));
+                        p.waveHardTimeoutMin(), p.autoFarmTransition(), p.postBattleViewSec()));
             } else if (slot == CFG_WAVE_BUILD_DURATION) {
                 int v = clamp(p.waveBuildDurationMin() + sign * (isShift ? 5 : 1), 1, 30);
                 session.pendingConfig = withPhaseDurations(c, new PhaseDurations(
                         p.farmDurationMin(), v, p.prepDurationSec(), p.wavePauseSec(),
-                        p.waveHardTimeoutMin(), p.autoFarmTransition()));
+                        p.waveHardTimeoutMin(), p.autoFarmTransition(), p.postBattleViewSec()));
             } else if (slot == CFG_PREP_DURATION) {
                 int v = clamp(p.prepDurationSec() + sign * (isShift ? 30 : 5), 0, 300);
                 session.pendingConfig = withPhaseDurations(c, new PhaseDurations(
                         p.farmDurationMin(), p.waveBuildDurationMin(), v, p.wavePauseSec(),
-                        p.waveHardTimeoutMin(), p.autoFarmTransition()));
+                        p.waveHardTimeoutMin(), p.autoFarmTransition(), p.postBattleViewSec()));
             } else if (slot == CFG_WAVE_PAUSE) {
                 int v = clamp(p.wavePauseSec() + sign * (isShift ? 5 : 1), 0, 60);
                 session.pendingConfig = withPhaseDurations(c, new PhaseDurations(
                         p.farmDurationMin(), p.waveBuildDurationMin(), p.prepDurationSec(), v,
-                        p.waveHardTimeoutMin(), p.autoFarmTransition()));
+                        p.waveHardTimeoutMin(), p.autoFarmTransition(), p.postBattleViewSec()));
             } else if (slot == CFG_WAVE_HARD_TIMEOUT) {
                 int v = clamp(p.waveHardTimeoutMin() + sign * (isShift ? 5 : 1), 1, 60);
                 session.pendingConfig = withPhaseDurations(c, new PhaseDurations(
                         p.farmDurationMin(), p.waveBuildDurationMin(), p.prepDurationSec(),
-                        p.wavePauseSec(), v, p.autoFarmTransition()));
+                        p.wavePauseSec(), v, p.autoFarmTransition(), p.postBattleViewSec()));
             } else if (slot == CFG_AUTO_FARM) {
                 session.pendingConfig = withPhaseDurations(c, new PhaseDurations(
                         p.farmDurationMin(), p.waveBuildDurationMin(), p.prepDurationSec(),
-                        p.wavePauseSec(), p.waveHardTimeoutMin(), !p.autoFarmTransition()));
+                        p.wavePauseSec(), p.waveHardTimeoutMin(), !p.autoFarmTransition(),
+                        p.postBattleViewSec()));
+            } else if (slot == CFG_POST_BATTLE_VIEW) {
+                int v = clamp(p.postBattleViewSec() + sign * (isShift ? 5 : 1), 0, 120);
+                session.pendingConfig = withPhaseDurations(c, new PhaseDurations(
+                        p.farmDurationMin(), p.waveBuildDurationMin(), p.prepDurationSec(),
+                        p.wavePauseSec(), p.waveHardTimeoutMin(), p.autoFarmTransition(), v));
             } else if (slot == CFG_STARTER_KIT) {
                 StarterKitConfig.Type[] cycle = {
                         StarterKitConfig.Type.NONE,

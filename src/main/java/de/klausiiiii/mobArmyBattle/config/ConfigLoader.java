@@ -43,7 +43,8 @@ public final class ConfigLoader {
                     cfg.getInt("phases.prep-duration-sec", defaults.prepDurationSec()),
                     cfg.getInt("phases.wave-pause-sec", defaults.wavePauseSec()),
                     cfg.getInt("phases.wave-hard-timeout-min", defaults.waveHardTimeoutMin()),
-                    cfg.getBoolean("phases.auto-farm-transition", defaults.autoFarmTransition()));
+                    cfg.getBoolean("phases.auto-farm-transition", defaults.autoFarmTransition()),
+                    cfg.getInt("phases.post-battle-view-sec", defaults.postBattleViewSec()));
         } catch (IllegalArgumentException e) {
             log.warning("phases section invalid, using defaults: " + e.getMessage());
             return defaults;
